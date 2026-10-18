@@ -4,7 +4,7 @@ An automated, template-driven Optical Mark Recognition (OMR) processing and scor
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 The project provides an end-to-end pipeline spanning from custom OMR sheet design to graded score exports:
 
@@ -33,7 +33,7 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 omr_checker/
@@ -56,7 +56,7 @@ omr_checker/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites & Environment Setup
 
@@ -111,7 +111,7 @@ python scans_to_csv/omr_to_csv.py --help
 
 ---
 
-## 📊 Output Format & Quality Checks
+## Output Format & Quality Checks
 
 [`output/results.csv`](file:///c:/Acads/omr_checker/output/results.csv) contains one row per evaluated sheet:
 
