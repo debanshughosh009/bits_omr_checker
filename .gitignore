@@ -1,0 +1,81 @@
+# ==============================================================================
+# OMR Checker - Git Ignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Input Directories & Scan Files
+# ------------------------------------------------------------------------------
+# Root and nested input directories
+input/
+inputs/
+scans/
+scan/
+DD_Quiz1_CS/
+*_Quiz*/
+*Quiz*/
+
+# Raw scan image & document files
+*.jpg
+*.jpeg
+*.png
+*.tif
+*.tiff
+*.bmp
+*.pdf
+
+# Preserve template definitions, overlays and documentation assets
+!templates/*.png
+!**/templates/*.png
+!**/templates/*.json
+!docs/**
+!*.md
+
+# ------------------------------------------------------------------------------
+# Output Directories & Result Files
+# ------------------------------------------------------------------------------
+# Root and nested output directories
+output/
+outputs/
+baseline_results/
+overlays/
+work/
+_omr_work*/
+temp/
+tmp/
+
+# Result spreadsheets and data exports
+results.csv
+Results_*.csv
+*.xlsx
+*.xls
+*.csv.tmp
+
+# ------------------------------------------------------------------------------
+# Python & Environment Artifacts
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env
+
+# ------------------------------------------------------------------------------
+# IDE & Operating System Files
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+
+master\templates\overlay.png

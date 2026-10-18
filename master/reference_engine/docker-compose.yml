@@ -1,0 +1,6 @@
+services:
+  omr:
+    build: .
+    volumes:
+      - ./inputs/bits_omr:/app/inputs/bits_omr
+      - ./outputs:/app/outputs

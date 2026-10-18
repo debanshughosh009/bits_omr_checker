@@ -1,0 +1,378 @@
+{
+  "pageDimensions": [
+    1791,
+    2576
+  ],
+  "bubbleDimensions": [
+    38,
+    38
+  ],
+  "preProcessors": [],
+  "customLabels": {
+    "ID NO": [
+      "id1",
+      "id2",
+      "id3",
+      "id4",
+      "id5",
+      "id6",
+      "id7",
+      "id8",
+      "id9",
+      "id10",
+      "id11",
+      "id12",
+      "id13"
+    ]
+  },
+  "fieldBlocks": {
+    "Set": {
+      "bubbleValues": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "direction": "horizontal",
+      "fieldLabels": [
+        "Set"
+      ],
+      "bubblesGap": 62.4,
+      "labelsGap": 0,
+      "origin": [
+        1417,
+        479
+      ]
+    },
+    "ID1": {
+      "bubbleValues": [
+        "2"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id1"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        853,
+        703
+      ]
+    },
+    "ID2": {
+      "bubbleValues": [
+        "0"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id2"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        915,
+        703
+      ]
+    },
+    "ID3": {
+      "bubbleValues": [
+        "1",
+        "2"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id3"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        978,
+        703
+      ]
+    },
+    "ID4": {
+      "bubbleValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id4"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1040,
+        703
+      ]
+    },
+    "ID5": {
+      "bubbleValues": [
+        "A",
+        "B",
+        "H",
+        "P"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id5"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1103,
+        703
+      ]
+    },
+    "ID6": {
+      "bubbleValues": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "7",
+        "8",
+        "A",
+        "H"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id6"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1165,
+        703
+      ]
+    },
+    "ID7": {
+      "bubbleValues": [
+        "P",
+        "T",
+        "A",
+        "B",
+        "X",
+        "0",
+        "1",
+        "2",
+        "4"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id7"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1227,
+        703
+      ]
+    },
+    "ID8": {
+      "bubbleValues": [
+        "A",
+        "F",
+        "P",
+        "S",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id8"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1290,
+        703
+      ]
+    },
+    "ID9": {
+      "bubbleValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id9"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1352,
+        703
+      ]
+    },
+    "ID10": {
+      "bubbleValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id10"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1415,
+        703
+      ]
+    },
+    "ID11": {
+      "bubbleValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id11"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1477,
+        703
+      ]
+    },
+    "ID12": {
+      "bubbleValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id12"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1539,
+        703
+      ]
+    },
+    "ID13": {
+      "bubbleValues": [
+        "H"
+      ],
+      "direction": "vertical",
+      "fieldLabels": [
+        "id13"
+      ],
+      "bubblesGap": 56.0,
+      "labelsGap": 0,
+      "origin": [
+        1602,
+        703
+      ]
+    },
+    "Q1_15": {
+      "fieldType": "QTYPE_MCQ4",
+      "fieldLabels": [
+        "q1..15"
+      ],
+      "bubblesGap": 62.4,
+      "labelsGap": 56.14,
+      "origin": [
+        244,
+        1487
+      ]
+    },
+    "Q16_30": {
+      "fieldType": "QTYPE_MCQ4",
+      "fieldLabels": [
+        "q16..30"
+      ],
+      "bubblesGap": 62.4,
+      "labelsGap": 56.14,
+      "origin": [
+        1330,
+        1487
+      ]
+    }
+  },
+  "outputColumns": [
+    "Set",
+    "ID NO",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "q5",
+    "q6",
+    "q7",
+    "q8",
+    "q9",
+    "q10",
+    "q11",
+    "q12",
+    "q13",
+    "q14",
+    "q15",
+    "q16",
+    "q17",
+    "q18",
+    "q19",
+    "q20",
+    "q21",
+    "q22",
+    "q23",
+    "q24",
+    "q25",
+    "q26",
+    "q27",
+    "q28",
+    "q29",
+    "q30"
+  ]
+}
