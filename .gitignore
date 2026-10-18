@@ -6,7 +6,8 @@
 # Input Directories & Scan Files
 # ------------------------------------------------------------------------------
 # Root and nested input directories
-input/
+input/*
+!input/.gitkeep
 inputs/
 scans/
 scan/
@@ -27,6 +28,7 @@ DD_Quiz1_CS/
 !templates/*.png
 !**/templates/*.png
 !**/templates/*.json
+!**/overlay.png
 !docs/**
 !*.md
 
@@ -34,7 +36,8 @@ DD_Quiz1_CS/
 # Output Directories & Result Files
 # ------------------------------------------------------------------------------
 # Root and nested output directories
-output/
+output/*
+!output/.gitkeep
 outputs/
 baseline_results/
 overlays/
