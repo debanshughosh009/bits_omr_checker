@@ -20,16 +20,15 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 ```
 
 ### Key Architectural Stages
-1. **Template & Engine Specs ([`master/`](file:///c:/Acads/omr_checker/master/)):**
-   - Reference templates (`template.json`, `config.json`, `overlay.png`) calibrated to 215 DPI canonical sheets.
-   - Master architecture roadmap and reference engine.
-2. **Scans to CSV ([`scans_to_csv/`](file:///c:/Acads/omr_checker/scans_to_csv/)):**
+1. **Scans to CSV ([`scans_to_csv/`](file:///c:/Acads/omr_checker/scans_to_csv/)):**
    - **Stage 1 CLI Engine:** Processes batches of scanned JPG, PNG, and PDF sheets.
+   - Self-contained pipeline: includes its own detection engine (`src/`), `template.json`, and `config.json`.
    - Detects corner alignment markers, corrects skew, samples bubble fills, decodes alphanumeric IDs and sets, and writes clean CSV data.
    - Performs built-in anomaly detection (`MULTI` options, incomplete `ID_LEN`, missing `NO_SET`).
-3. **Scoring & Evaluation (Subsequent Stages):**
-   - Applies set-specific answer keys (+4/-1 or custom schemes).
-   - Matches student IDs against official course rosters and generates review queues for flagged sheets.
+2. **Template Utilities ([`scripts/`](file:///c:/Acads/omr_checker/scripts/)):**
+   - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
+3. **Architecture & Documentation ([`docs/`](file:///c:/Acads/omr_checker/docs/)):**
+   - Multi-milestone architecture plan (`plan.md`) for future scoring, roster validation, and OMR designer phases.
 
 ---
 
@@ -46,11 +45,14 @@ omr_checker/
 │   ├── requirements.txt    # Python dependencies
 │   ├── src/                # Pipeline engine (alignment, detection, parser)
 │   └── README.md           # Stage 1 documentation
-├── master/                 # Upstream reference assets, schemas & roadmap
-│   ├── templates/          # Reference template files
-│   ├── scripts/            # Template generation & schema validators
-│   ├── docs/               # Multi-milestone architecture plan
-│   └── reference_engine/   # Upstream reference engine
+├── docs/                   # Multi-milestone roadmap & documentation
+│   ├── plan.md             # Master architecture roadmap (M0-M8)
+│   ├── bits_omr_README.md  # Sheet layout calibration notes
+│   └── OMRChecker_README.md
+├── scripts/                # Developer utilities for templates
+│   ├── make_template.py    # Generates template.json
+│   ├── check_template.py   # Visual alignment checker
+│   └── validate_schema.py  # Schema validator
 └── .gitignore              # Ignores scans & result data while tracking empty folders
 ```
 
