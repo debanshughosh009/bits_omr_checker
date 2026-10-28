@@ -120,7 +120,7 @@ python scans_to_csv/omr_to_csv.py --help
 
 ### 3. Designing a New Sheet
 
-Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the year, the last four digits, and the campus letter (`20231187H`): "20" printed, then bubbles for the rest of the year, the four digits, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
+Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter (`F20231187H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year, the four digits, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
 
 - **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
 - **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.

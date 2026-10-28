@@ -16,7 +16,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
 DPI = 200
-ID = "20271293G"   # "20" is printed, the rest is bubbled
+ID = "H20271293G"   # "20" is printed, the rest is bubbled
 SET = "C"
 
 DUMP = """
