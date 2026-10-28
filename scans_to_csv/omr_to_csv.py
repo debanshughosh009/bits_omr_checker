@@ -189,7 +189,8 @@ def clean_csv(
     df.columns = df.columns.str.strip().str.strip('"')
     if id_columns:  # one-character entries are fixed, the rest are bubbled column labels
         df = df.fillna("")
-        df["ID NO"] = df.apply(lambda r: "".join(c if len(c) == 1 else r.get(c, "") for c in id_columns), axis=1)
+        # a list, not df.apply: apply returns a DataFrame when every sheet failed and df is empty
+        df["ID NO"] = ["".join(c if len(c) == 1 else r.get(c, "") for c in id_columns) for _, r in df.iterrows()]
     id_len = len(id_columns) if id_columns else 13
 
     # Determine columns to keep
