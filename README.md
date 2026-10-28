@@ -49,7 +49,12 @@ omr_checker/
 │   ├── plan.md             # Master architecture roadmap (M0-M8)
 │   ├── bits_omr_README.md  # Sheet layout calibration notes
 │   └── OMRChecker_README.md
+├── designer/               # Sheet designer: prints a new OMR sheet and its template.json
+│   ├── index.html          # Open in a browser; form on the left, A4 sheet on the right
+│   ├── sheet.js            # The layout both the printout and the template come from
+│   └── app.js              # The form
 ├── scripts/                # Developer utilities for templates
+│   ├── check_designer.py   # Round trip: designed sheet -> filled scan -> CSV
 │   ├── make_template.py    # Generates template.json
 │   ├── check_template.py   # Visual alignment checker
 │   └── validate_schema.py  # Schema validator
@@ -110,6 +115,20 @@ python scans_to_csv/omr_to_csv.py --help
 | `--config` | JSON config with detection thresholds | `scans_to_csv/config.json` |
 | `--overlays` | Output folder for annotated verification images | `None` |
 | `--keep-work` | Keep temporary extraction directory | `False` |
+
+---
+
+### 3. Designing a New Sheet
+
+Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the year, the last four digits, and the campus letter (`20231187H`): "20" printed, then bubbles for the rest of the year, the four digits, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
+
+- **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
+- **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
+- **Save draft** / **Open…** keep the form as a `.json` file; the browser also remembers the last draft.
+
+The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. Sheets printed before the designer still use the hand-calibrated `scans_to_csv/template.json`.
+
+`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed.
 
 ---
 
