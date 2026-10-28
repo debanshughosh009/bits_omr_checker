@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OMR Sheet Designer</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>OMR Sheet Designer</h1>
+      <div class="bar-actions">
+        <div class="group" role="group" aria-label="Draft">
+          <button type="button" id="new" title="Start a new sheet">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New
+          </button>
+          <label class="button" title="Open a saved draft"
+            ><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Open<input
+              type="file" id="open" accept=".json,application/json" hidden
+          /></label>
+          <button type="button" id="save" title="Download this draft as a .json file">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>Save
+          </button>
+        </div>
+        <button type="button" id="template" title="Download the template.json the reader needs for this sheet">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4c-2 0-2 2-2 4s-2 4-2 4 2 2 2 4 0 4 2 4M16 4c2 0 2 2 2 4s2 4 2 4-2 2-2 4 0 4-2 4"/></svg>Template
+        </button>
+        <button type="button" id="print" class="primary" title="Print the sheet or save it as a PDF">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/></svg>Print / PDF
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <div class="editor">
+        <ul id="issues" class="issues" aria-live="polite"></ul>
+        <form id="form" autocomplete="off">
+          <fieldset>
+            <legend>Header</legend>
+            <label>Title <input name="title" /></label>
+            <div class="grid">
+              <label>Exam <input name="exam" /></label>
+              <label>Course <input name="course" placeholder="EEE F111 Electrical Sciences" /></label>
+              <label>Date <input name="date" placeholder="12 Sep 2026" /></label>
+            </div>
+            <label
+              >Instructions <small>one per line, printed small beside the ID grid</small>
+              <textarea name="instructions" rows="2"></textarea>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Set</legend>
+            <label class="check"><input type="checkbox" name="showSet" /> Print a set box</label>
+            <label>Sets <small>one letter each</small> <input name="sets" /></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>ID number</legend>
+            <label>Heading <input name="idTitle" /></label>
+            <p class="hint">The format is fixed: the year, the last four digits, and the campus letter, as in 20231187H. The “20” is printed. Each column has a box above it to write the character in.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Questions</legend>
+            <div class="grid">
+              <label>Options <small>one letter each</small> <input name="options" /></label>
+              <label>Number of questions <input name="questions" type="number" min="1" max="300" /></label>
+            </div>
+            <p class="hint" id="fit"></p>
+          </fieldset>
+        </form>
+      </div>
+
+      <section class="preview" aria-label="Printed sheet">
+        <div class="preview-head">Preview <span>A4, exactly as printed</span></div>
+        <div class="preview-holder"><div id="sheet" class="page"></div></div>
+      </section>
+    </main>
+
+    <script src="sheet.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
