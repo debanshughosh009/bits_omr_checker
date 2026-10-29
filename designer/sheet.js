@@ -118,11 +118,11 @@ function layout(s) {
     out.lines.push({ x1: x0 + label.length * 1.5 + 2, y1: y + 0.6, x2: x1, y2: y + 0.6, width: 0.2 });
   };
   y += 5;
-  blank("Name", left, leftRight);
+  const end = left + (leftRight - left) * 0.7, mid = left + (end - left) * 0.62;
+  blank("Name", left, end);
   y += 9;
-  const mid = left + (leftRight - left) * 0.62;
   blank("Signature", left, mid - 4);
-  blank("Date", mid, leftRight);
+  blank("Date", mid, end);
   y += 3;
 
   // questions, numbered down each column, spread across the width
