@@ -7,7 +7,7 @@ const PAGE = { w: 210, h: 297 };
 const MARGIN = 20;                 // printed content stays this far from the page edge
 const MARKER = { size: 8, inset: 12 }; // corner markers, centred `inset` from each edge
 const BUBBLE = 4.2;                // bubble diameter
-const ID_COL = 5.2, ID_ROW = 4.6;  // ID grid pitch
+const ID_COL = 5.2, ID_ROW = 5.6;  // ID grid pitch
 const OPT = 5.8, Q_ROW = 5.8;      // question pitch: between options, between questions
 const Q_LABEL = 8;                 // room for the question number left of the first bubble
 const Q_GUTTER = 4;                // space between question columns
@@ -68,15 +68,16 @@ function layout(s) {
   if (sub) out.texts.push({ x: PAGE.w / 2, y: 28, text: sub, size: 3.4, anchor: "middle" });
   out.lines.push({ x1: left, y1: 32, x2: right, y2: 32, width: 0.3 });
 
-  // ID grid, right-aligned: a write-in box over each column, bubbles below
+  // ID grid, right-aligned: the heading beside a write-in box over each column, bubbles below
   const idCols = ID_COLUMNS.map(chars);
-  const bandTop = 39;
+  const bandTop = 39, boxTop = bandTop - 2;
   const idX0 = right - BUBBLE / 2 - (idCols.length - 1) * ID_COL;
+  const idTitleW = (s.idTitle || "").length * 3 * 0.62; // ponytail: bold caps at ~0.62 em
   let idBottom = bandTop;
   if (idCols.length) {
-    out.texts.push({ x: idX0 - BUBBLE / 2, y: bandTop, text: s.idTitle, size: 3, bold: true });
+    out.texts.push({ x: idX0 - ID_COL / 2 - 1.5, y: boxTop + 3.8, text: s.idTitle, size: 3, bold: true, anchor: "end" });
     idCols.forEach((symbols, i) => {
-      const cx = idX0 + i * ID_COL, boxTop = bandTop + 2, top = boxTop + 9;
+      const cx = idX0 + i * ID_COL, top = boxTop + 9.5;
       out.boxes.push({ x: cx - ID_COL / 2 + 0.3, y: boxTop, w: ID_COL - 0.6, h: 5.5 });
       if (symbols.length === 1) { // fixed: the reader puts it back into the ID (template idColumns)
         out.texts.push({ x: cx, y: boxTop + 4, text: symbols[0], size: 3.4, bold: true, anchor: "middle" });
@@ -101,7 +102,7 @@ function layout(s) {
     const bubbles = sets.map((label, i) => ({ cx: left + 12 + i * OPT, cy: y, label }));
     out.bubbles.push(...bubbles);
     out.fields.push({ name: "Set", label: "Set", direction: "horizontal", bubbles, gap: OPT });
-    if (bubbles.at(-1).cx + BUBBLE / 2 > leftRight) issues.push("Too many sets to fit beside the ID grid.");
+    if (bubbles.at(-1).cx + BUBBLE / 2 > leftRight - idTitleW) issues.push("Too many sets to fit beside the ID grid.");
     y += 8;
   }
   for (const line of lines(s.instructions)) {
