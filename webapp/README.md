@@ -32,12 +32,13 @@ Data goes to `data/` in the repo (git-ignored). Override with the `OMR_DATA_DIR`
 ## Workflow
 
 **Designer** (`/designer`)
-- **Design a new sheet:** choose the number of questions (1–300), options per question (2–8), question-paper sets (none or 2–8), student ID digits (0–20) and a title. The preview updates as you type.
+- **Design a new sheet:** choose the number of questions (1–300), options per question (2–8), question-paper sets (none or 2–8), whether to include the BITS ID grid (`(F/H/P) 2 0 (0-4) (0-9) (0-9)×4 (H/P/G)`, the same format as `designer/`) and a title. The preview updates as you type.
   - Creating the layout saves a printable `sheet.pdf` with corner markers, plus `template.json`, `config.json` and `omr_marker.png`.
   - Print the PDF at 100% on A4. Scans of it are straightened using the markers.
   - The same generator is available on the command line: `python webapp/sheet_designer.py --help`.
 - **Upload a custom template:**
   - Upload `template.json` (required), `config.json` (optional), the blank sheet as PNG/JPG/PDF (optional), and any files the template refers to, such as a `CropOnMarkers` marker image.
+  - Templates saved from `designer/index.html` work as they are. Their marker image is drawn automatically.
   - Check the bubble preview: green boxes should sit on the printed circles. For marker-based templates, the blank sheet is straightened first.
 - Each layout page has downloads for every file and a ZIP of all of them. The BITS Hyderabad 30Q layout from `scans_to_csv/` is installed on first start.
 
@@ -65,7 +66,7 @@ Scores are recomputed automatically whenever the key, settings or a sheet change
 |---|---|
 | `app.py` | Flask routes |
 | `pipeline.py` | Storage, layouts, exams, background scan-processing queue |
-| `sheet_designer.py` | Generates a printable sheet + template from questions/options/sets/ID digits (also a CLI) |
+| `sheet_designer.py` | Generates a printable sheet + template from questions/options/sets, with the BITS ID grid (also a CLI) |
 | `run_stage1.py` | Runs Stage 1 on machines with no display (supplies a stand-in monitor for screeninfo) |
 | `templates/`, `static/` | Pages, styles, sheet designer preview, answer key editor and upload scripts |
 

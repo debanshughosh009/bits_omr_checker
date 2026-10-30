@@ -18,8 +18,9 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 // BITS ID number as degree (F first degree, H higher degree, P PhD), year, last
 // four digits, campus (F20231187H), one string per column listing its symbols top
 // to bottom. A one-symbol column is fixed: printed in its box, not bubbled.
+// Format: (F/H/P) 2 0 (0-4) (0-9)  (0-9)(0-9)(0-9)(0-9)  (H/P/G)
 const D = "0123456789";
-const ID_COLUMNS = ["FHP", "2", "0", "1234", D, D, D, D, D, "HGPD"];
+const ID_COLUMNS = ["FHP", "2", "0", "01234", D, D, D, D, D, "HPG"];
 const PX_PER_MM = 8;               // template resolution; scans are resized to this frame
 
 // The reader warps every scan so the marker centres become the template's corners,

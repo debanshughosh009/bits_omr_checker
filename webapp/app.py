@@ -2,7 +2,7 @@
 OMR Checker web app.
 
 Designer:  generates a printable sheet + template from the number of
-           questions, options, sets and ID digits, or uploads an existing
+           questions, options and sets (BITS ID grid optional), or uploads an existing
            layout (template.json, optional config.json, blank sheet).
 Professor: creates an exam on a layout, enters the answer key on a clickable
            grid, uploads scans (single, batch or ZIP) and downloads
@@ -65,10 +65,11 @@ def index():
 
 @app.route("/designer")
 def designer():
-    defaults = {"questions": 30, "options": 4, "sets": 0, "id_digits": 10, "title": "", "name": ""}
+    defaults = {"questions": 30, "options": 4, "sets": 0, "id_format": "bits", "title": "", "name": ""}
     form = {k: request.args.get(k, v) for k, v in defaults.items()}
     return render_template("designer.html", layouts=pl.list_layouts(), form=form,
-                           limits=pl.sheet_designer.LIMITS)
+                           limits=pl.sheet_designer.LIMITS,
+                           bits_id=pl.sheet_designer.id_format_text(pl.sheet_designer.ID_COLUMNS))
 
 
 @app.post("/designer/layouts")

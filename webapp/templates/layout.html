@@ -12,7 +12,7 @@
       <dt>Questions</dt><dd>{{ layout.info.questions|length }} ({{ layout.info.questions[0] }}–{{ layout.info.questions[-1] }})</dd>
       <dt>Options</dt><dd>{{ layout.info.all_options|join(', ') }}</dd>
       <dt>Sets</dt><dd>{{ layout.info.sets|join(', ') or 'none (one key for all sheets)' }}</dd>
-      <dt>Student ID</dt><dd>{{ layout.info.id_length ~ ' characters' if layout.info.id_length else 'not on this sheet' }}</dd>
+      <dt>ID number</dt><dd>{% if layout.info.id_format %}<span class="mono">{{ layout.info.id_format }}</span>{% elif layout.info.id_length %}{{ layout.info.id_length }} characters{% else %}not on this sheet{% endif %}</dd>
       {% if layout.generated %}
       <dt>Sheet</dt><dd>A4, {{ layout.generated.columns }} column(s) × {{ layout.generated.rows }} row(s), corner markers</dd>
       {% else %}

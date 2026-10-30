@@ -8,7 +8,7 @@
 
   async function refresh() {
     const params = new URLSearchParams();
-    for (const name of ["title", "questions", "options", "sets", "id_digits"]) {
+    for (const name of ["title", "questions", "options", "sets", "id_format"]) {
       params.set(name, form.elements[name].value);
     }
     const mine = ++seq;

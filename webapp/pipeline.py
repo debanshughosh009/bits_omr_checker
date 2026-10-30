@@ -60,6 +60,7 @@ QUESTION_RE = re.compile(r"q\d+")
 sys.path.insert(0, str(REPO_ROOT / "scans_to_csv"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sheet_designer  # noqa: E402
+from omr_to_csv import write_marker  # noqa: E402
 from src.constants.common import FIELD_TYPES  # noqa: E402
 from src.schemas.constants import FIELD_STRING_REGEX_GROUPS  # noqa: E402
 from src.schemas.template_schema import TEMPLATE_SCHEMA  # noqa: E402
@@ -135,6 +136,20 @@ def write_csv(path: Path, header: list[str], rows: list[dict]) -> None:
 # Layouts (designer)
 # ---------------------------------------------------------------------------
 
+def engine_template(tpl: dict) -> dict:
+    """
+    The template as the engine sees it. Templates from the sheet designers carry
+    "idColumns" (fixed ID characters among the bubbled columns), which
+    scans_to_csv/omr_to_csv.py strips the same way before running the engine.
+    """
+    if "idColumns" not in tpl:
+        return tpl
+    engine_tpl = {k: v for k, v in tpl.items() if k not in ("idColumns", "customLabels")}
+    bubbled = [c for c in tpl["idColumns"] if len(c) > 1]
+    engine_tpl["outputColumns"] = [x for c in tpl["outputColumns"] for x in (bubbled if c == "ID NO" else [c])]
+    return engine_tpl
+
+
 def validate_template(tpl) -> None:
     import jsonschema
 
@@ -143,8 +158,11 @@ def validate_template(tpl) -> None:
     for key in ("pageDimensions", "fieldBlocks", "outputColumns"):
         if key not in tpl:
             raise PipelineError(f"template.json is missing '{key}'")
+    if "idColumns" in tpl and not (isinstance(tpl["idColumns"], list)
+                                   and all(isinstance(c, str) and c for c in tpl["idColumns"])):
+        raise PipelineError("template.json 'idColumns' must be a list of non-empty strings")
     try:
-        jsonschema.validate(tpl, TEMPLATE_SCHEMA)
+        jsonschema.validate(engine_template(tpl), TEMPLATE_SCHEMA)
     except jsonschema.ValidationError as e:
         where = "/".join(str(p) for p in e.absolute_path) or "root"
         raise PipelineError(f"template.json is invalid at '{where}': {e.message}")
@@ -208,12 +226,18 @@ def template_info(tpl: dict) -> dict:
                 all_options.append(o)
 
     custom = tpl.get("customLabels", {})
+    if "idColumns" in tpl:
+        id_cols = [c if len(c) == 1 else "".join(field_values.get(c, [])) for c in tpl["idColumns"]]
+        id_format = sheet_designer.id_format_text(id_cols)
+    else:
+        id_format = ""
     return {
         "questions": questions,
         "options": options,
         "all_options": all_options,
         "sets": field_values.get("Set", []),
-        "id_length": len(custom.get("ID NO", [])),
+        "id_length": len(tpl["idColumns"]) if "idColumns" in tpl else len(custom.get("ID NO", [])),
+        "id_format": id_format,
         "page": tpl["pageDimensions"],
         "blocks": len(tpl["fieldBlocks"]),
     }
@@ -376,12 +400,18 @@ def create_layout(name, template_bytes, config_bytes=None, sheet_name=None, shee
     tpl = parse_json_upload(template_bytes, "template.json")
     validate_template(tpl)
     assets = {safe_name(n): data for n, data in (assets or []) if data}
+    draw_marker = None
     for pp in tpl.get("preProcessors", []):
         rel = pp.get("options", {}).get("relativePath")
         if rel and rel not in assets:
-            raise PipelineError(
-                f"The template's {pp['name']} step needs the file '{rel}'. Upload it under 'Template files'."
-            )
+            if pp.get("name") == "CropOnMarkers":
+                # Sheets from designer/ don't ship their marker; Stage 1 draws the
+                # standard one, so draw it here too (for the preview and downloads).
+                draw_marker = safe_name(rel)
+            else:
+                raise PipelineError(
+                    f"The template's {pp['name']} step needs the file '{rel}'. Upload it under 'Template files'."
+                )
     cfg = None
     if config_bytes:
         cfg = parse_json_upload(config_bytes, "config.json")
@@ -402,6 +432,8 @@ def create_layout(name, template_bytes, config_bytes=None, sheet_name=None, shee
             write_json(folder / "config.json", cfg)
         for asset_name, data in assets.items():
             (folder / asset_name).write_bytes(data)
+        if draw_marker:
+            write_marker(folder / draw_marker)
         sheet = None
         if sheet_bytes:
             sheet = f"sheet{sheet_ext}"
@@ -427,7 +459,7 @@ def design_params(form: dict) -> dict:
         "questions": num("questions", 30),
         "options": num("options", 4),
         "sets": num("sets", 0),
-        "id_digits": num("id_digits", 0),
+        "id_format": str(form.get("id_format", "bits")),
         "title": str(form.get("title", "") or "Answer Sheet").strip(),
     }
 

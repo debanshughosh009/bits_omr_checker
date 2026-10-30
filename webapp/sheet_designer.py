@@ -1,12 +1,16 @@
 """
 Generate a printable OMR sheet and its matching template from a few numbers.
 
-    python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --id-digits 10 --out my_sheet/
+    python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --out my_sheet/
 
 Writes sheet.pdf (print this), sheet.png, template.json, config.json,
 omr_marker.png and preview.png. The sheet has four corner markers; the
 template uses OMRChecker's CropOnMarkers preprocessor to straighten scans
 with them, so template coordinates are measured from the marker centres.
+
+The ID grid and marker follow designer/sheet.js: ID_COLUMNS lists each ID
+column's symbols, a one-symbol column is printed rather than bubbled, and the
+template's "idColumns" tells scans_to_csv/omr_to_csv.py how to rebuild "ID NO".
 """
 
 import argparse
@@ -31,9 +35,17 @@ FRAME = (PAGE_W - 2 * MARKER_INSET, PAGE_H - 2 * MARKER_INSET)  # template pageD
 X0, X1 = 130, PAGE_W - 130                # content area
 Y_TOP, Y_BOTTOM = 120, PAGE_H - 140
 
-LIMITS = {"questions": (1, 300), "options": (2, 8), "sets": (0, 8), "id_digits": (0, 20)}
+LIMITS = {"questions": (1, 300), "options": (2, 8), "sets": (0, 8)}
 OPTION_LETTERS = "ABCDEFGH"
 SET_LETTERS = "ABCDEFGH"
+
+# BITS ID number, same columns as designer/sheet.js:
+# (F/H/P) 2 0 (0-4) (0-9)  (0-9)(0-9)(0-9)(0-9)  (H/P/G), e.g. F20231187H
+D = "0123456789"
+ID_COLUMNS = ["FHP", "2", "0", "01234", D, D, D, D, D, "HPG"]
+ID_FORMATS = {"bits": ID_COLUMNS, "none": []}
+# Concentric marker, as designer/sheet.js MARKER_RINGS and omr_to_csv.write_marker
+MARKER_RINGS = (1, 0.625, 0.3125)
 
 # Question grid sizes tried from roomiest to most compact:
 # (row pitch, bubble diameter, detection box)
@@ -72,12 +84,9 @@ def _bubble(draw, cx, cy, d, label):
 
 
 def _marker(draw, cx, cy):
-    s = MARKER_SIZE / 2
-    draw.rectangle([cx - s, cy - s, cx + s, cy + s], fill=INK)
-    s2 = MARKER_SIZE * 0.3
-    draw.rectangle([cx - s2, cy - s2, cx + s2, cy + s2], fill=255)
-    s3 = MARKER_SIZE * 0.13
-    draw.rectangle([cx - s3, cy - s3, cx + s3, cy + s3], fill=INK)
+    for i, k in enumerate(MARKER_RINGS):
+        s = MARKER_SIZE * k / 2
+        draw.rectangle([cx - s, cy - s, cx + s, cy + s], fill=255 if i % 2 else INK)
 
 
 def _box(cx, cy, box):
@@ -89,11 +98,13 @@ def _range_label(prefix, a, b):
     return f"{prefix}{a}" if a == b else f"{prefix}{a}..{b}"
 
 
-def validate(questions, options, sets, id_digits, title):
-    for name, val in (("questions", questions), ("options", options), ("sets", sets), ("id_digits", id_digits)):
+def validate(questions, options, sets, id_format, title):
+    for name, val in (("questions", questions), ("options", options), ("sets", sets)):
         lo, hi = LIMITS[name]
         if not isinstance(val, int) or not lo <= val <= hi:
-            raise DesignError(f"{name.replace('_', ' ').capitalize()} must be between {lo} and {hi}")
+            raise DesignError(f"{name.capitalize()} must be between {lo} and {hi}")
+    if id_format not in ID_FORMATS:
+        raise DesignError(f"ID format must be one of: {', '.join(ID_FORMATS)}")
     if len(title) > 80:
         raise DesignError("Title must be at most 80 characters")
 
@@ -124,16 +135,27 @@ def plan_questions(n, k, top):
         rows_max += 1
     raise DesignError(
         f"{n} questions with {k} options don't fit on one page with this header; "
-        f"the maximum is {cols_max * rows_max}. Reduce questions, options or ID digits."
+        f"the maximum is {cols_max * rows_max}. Reduce questions or options."
     )
 
 
-def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet"):
+def id_format_text(columns) -> str:
+    """'(F/H/P) 2 0 (0-4) (0-9) ... (H/P/G)' for a list of ID column symbols."""
+    def col(c):
+        if len(c) == 1:
+            return c
+        return "(0-9)" if c == D else ("(0-4)" if c == "01234" else f"({'/'.join(c)})")
+    return " ".join(col(c) for c in columns)
+
+
+def generate(questions=30, options=4, sets=0, id_format="bits", title="Answer Sheet"):
     """Return a dict with template, config and the image/PDF bytes for a new sheet."""
     title = (title or "Answer Sheet").strip()
-    validate(questions, options, sets, id_digits, title)
+    validate(questions, options, sets, id_format, title)
     opts = list(OPTION_LETTERS[:options])
     set_values = list(SET_LETTERS[:sets])
+    id_symbols = ID_FORMATS[id_format]
+    id_columns, id_labels = [], []     # template "idColumns" and the bubbled labels
 
     img = Image.new("L", (PAGE_W, PAGE_H), 255)
     draw = ImageDraw.Draw(img)
@@ -155,33 +177,43 @@ def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet")
     draw.line([X0 + 890, y + 28, X1, y + 28], fill=LINE, width=2)
     y += 75
 
-    # Student ID: write-in boxes above a 0-9 bubble grid per digit
+    # ID number: a write-in box over each column, bubbles below. A one-symbol
+    # column (the "2" and "0" of the year) is printed in its box, not bubbled.
     section_h = 0
-    if id_digits:
-        _text(draw, (X0, y), "Student ID", 24, bold=True)
+    if id_symbols:
+        _text(draw, (X0, y), "ID Number", 24, bold=True)
+        _text(draw, (X0 + 160, y + 4), "e.g. F20231187H", 18, fill=110)
         box_top = y + 40
-        for i in range(id_digits):
+        first_cy = box_top + 44 + 34
+        for i, symbols in enumerate(id_symbols):
             cx = X0 + ID_PITCH_X / 2 + i * ID_PITCH_X
             draw.rectangle([cx - 20, box_top, cx + 20, box_top + 44], outline=LINE, width=2)
-        first_cy = box_top + 44 + 34
-        for i in range(id_digits):
-            cx = X0 + ID_PITCH_X / 2 + i * ID_PITCH_X
-            for v in range(10):
-                cy = first_cy + v * ID_PITCH_Y
-                _bubble(draw, cx, cy, ID_D, str(v))
-                boxes.append((cx, cy, ID_BOX, str(v)))
-        blocks["ID"] = {
-            "fieldType": "QTYPE_INT",
-            "fieldLabels": [_range_label("id", 1, id_digits)],
-            "bubblesGap": ID_PITCH_Y,
-            "labelsGap": ID_PITCH_X,
-            "origin": _box(X0 + ID_PITCH_X / 2, first_cy, ID_BOX),
-        }
-        section_h = first_cy + 9 * ID_PITCH_Y + ID_D / 2 - y
+            if len(symbols) == 1:
+                _text(draw, (cx, box_top + 22), symbols, 28, bold=True, anchor="mm")
+                id_columns.append(symbols)
+                continue
+            for r, v in enumerate(symbols):
+                cy = first_cy + r * ID_PITCH_Y
+                _bubble(draw, cx, cy, ID_D, v)
+                boxes.append((cx, cy, ID_BOX, v))
+            label = f"id{i + 1}"
+            blocks[f"ID{i + 1}"] = {
+                "bubbleDimensions": [ID_BOX, ID_BOX],
+                "bubbleValues": list(symbols),
+                "direction": "vertical",
+                "fieldLabels": [label],
+                "bubblesGap": ID_PITCH_Y,
+                "labelsGap": 0,
+                "origin": _box(cx, first_cy, ID_BOX),
+            }
+            id_columns.append(label)
+            id_labels.append(label)
+        rows = max(len(c) for c in id_symbols)
+        section_h = first_cy + (rows - 1) * ID_PITCH_Y + ID_D / 2 - y
 
     # Set: one row of bubbles, to the right of the ID grid
     if set_values:
-        sx = X0 + (id_digits * ID_PITCH_X + 90 if id_digits else 0)
+        sx = X0 + (len(id_symbols) * ID_PITCH_X + 90 if id_symbols else 0)
         _text(draw, (sx, y), "Set", 24, bold=True)
         cy = y + 40 + SET_D / 2
         for i, v in enumerate(set_values):
@@ -189,6 +221,7 @@ def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet")
             _bubble(draw, cx, cy, SET_D, v)
             boxes.append((cx, cy, SET_BOX, v))
         blocks["Set"] = {
+            "bubbleDimensions": [SET_BOX, SET_BOX],
             "bubbleValues": set_values,
             "direction": "horizontal",
             "fieldLabels": ["Set"],
@@ -240,7 +273,7 @@ def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet")
     _text(draw, (PAGE_W / 2, PAGE_H - 40),
           f"{questions} questions · options {opts[0]}–{opts[-1]}"
           + (f" · sets {', '.join(set_values)}" if set_values else "")
-          + (f" · {id_digits}-digit ID" if id_digits else ""),
+          + (" · BITS ID number" if id_symbols else ""),
           16, fill=FAINT, anchor="mm")
 
     # Marker image: the printed marker with a white margin, MARKER_CROP px square
@@ -259,16 +292,13 @@ def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet")
                 "marker_rescale_steps": 8,
             },
         }],
-        "customLabels": {"ID NO": [f"id{i}" for i in range(1, id_digits + 1)]} if id_digits else {},
+        # idColumns is read by omr_to_csv.py (which removes it before the engine sees it)
+        # to put the fixed characters back into "ID NO"
+        **({"idColumns": id_columns, "customLabels": {"ID NO": id_labels}} if id_symbols else {}),
         "fieldBlocks": blocks,
-        "outputColumns": (["Set"] if set_values else []) + (["ID NO"] if id_digits else [])
+        "outputColumns": (["Set"] if set_values else []) + (["ID NO"] if id_symbols else [])
         + [f"q{i}" for i in range(1, questions + 1)],
     }
-    # ID and Set blocks use their own bubble sizes
-    if "ID" in blocks:
-        blocks["ID"]["bubbleDimensions"] = [ID_BOX, ID_BOX]
-    if "Set" in blocks:
-        blocks["Set"]["bubbleDimensions"] = [SET_BOX, SET_BOX]
 
     config = {
         "dimensions": {
@@ -305,7 +335,7 @@ def generate(questions=30, options=4, sets=0, id_digits=0, title="Answer Sheet")
         "marker_png": to_bytes(marker, "PNG"),
         "preview_png": to_bytes(preview, "PNG"),
         "params": {"questions": questions, "options": options, "sets": sets,
-                   "id_digits": id_digits, "title": title},
+                   "id_format": id_format, "title": title},
         "layout": {"columns": plan["cols"], "rows": plan["rows"], "bubble": d},
     }
 
@@ -324,12 +354,13 @@ def main():
     parser.add_argument("--questions", type=int, default=30)
     parser.add_argument("--options", type=int, default=4, help="Options per question (2-8)")
     parser.add_argument("--sets", type=int, default=0, help="Number of question-paper sets (0 = none)")
-    parser.add_argument("--id-digits", type=int, default=0, help="Digits in the student ID (0 = no ID grid)")
+    parser.add_argument("--id-format", choices=list(ID_FORMATS), default="bits",
+                        help="bits: (F/H/P) 2 0 (0-4) (0-9) (0-9)x4 (H/P/G); none: no ID grid")
     parser.add_argument("--title", default="Answer Sheet")
     parser.add_argument("--out", required=True, help="Output folder")
     args = parser.parse_args()
     try:
-        bundle = generate(args.questions, args.options, args.sets, args.id_digits, args.title)
+        bundle = generate(args.questions, args.options, args.sets, args.id_format, args.title)
     except DesignError as e:
         parser.error(str(e))
     write_bundle(bundle, Path(args.out))

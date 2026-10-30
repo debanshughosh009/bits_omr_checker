@@ -28,15 +28,18 @@
               <option value="{{ n }}" {{ 'selected' if form.sets|int == n }}>{{ n }} (A–{{ 'ABCDEFGH'[n - 1] }})</option>
             {% endfor %}
           </select></label>
-        <label>Student ID digits
-          <input type="number" name="id_digits" min="{{ limits.id_digits[0] }}" max="{{ limits.id_digits[1] }}" value="{{ form.id_digits }}"></label>
+        <label>ID number
+          <select name="id_format">
+            <option value="bits" {{ 'selected' if form.id_format == 'bits' }}>BITS ID: {{ bits_id }}</option>
+            <option value="none" {{ 'selected' if form.id_format == 'none' }}>no ID grid</option>
+          </select></label>
       </div>
       <label>Layout name <span class="muted">shown to professors; defaults to the title</span>
         <input name="name" value="{{ form.name }}" placeholder="e.g. EEE quiz 40Q 5 options"></label>
       <p id="design-error" class="flash error hidden"></p>
       <button class="btn primary">Create layout</button>
     </form>
-    <p class="muted small">Up to {{ limits.questions[1] }} questions on one A4 page. Bubbles shrink automatically when there are many questions. Set the ID digits to 0 to leave out the ID grid. IDs are digits only; for IDs with letters (like BITS IDs), upload a custom template below.</p>
+    <p class="muted small">Up to {{ limits.questions[1] }} questions on one A4 page. Bubbles shrink automatically when there are many questions. The ID grid has a write-in box over each column; the "2 0" of the year is printed, the rest is bubbled (e.g. <code>F20231187H</code>), the same format as <code>designer/index.html</code>.</p>
   </section>
 
   <section class="card">
@@ -79,7 +82,7 @@
         <input type="file" name="config" accept=".json"></label>
       <label>Blank sheet <span class="muted">optional PNG / JPG / PDF, for printing and preview</span>
         <input type="file" name="sheet" accept=".png,.jpg,.jpeg,.pdf"></label>
-      <label>Template files <span class="muted">files the template refers to, e.g. the marker image for CropOnMarkers</span>
+      <label>Template files <span class="muted">files the template refers to, e.g. the marker image for CropOnMarkers (templates from <code>designer/</code> don't need one)</span>
         <input type="file" name="assets" multiple></label>
       <button class="btn">Upload layout</button>
     </form>
