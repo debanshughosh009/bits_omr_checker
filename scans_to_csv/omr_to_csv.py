@@ -84,15 +84,28 @@ def build_work_dir(
     inputs_dir = work_root / "inputs"
     inputs_dir.mkdir(exist_ok=True)
 
-    # Copy template
-    shutil.copy2(template_path, work_root / "template.json")
+    # Copy template. A designer template's "idColumns" lists the ID's fixed
+    # characters among its bubbled columns; the engine reads the bubbled columns
+    # one by one and clean_csv puts the ID back together.
+    tpl = json.loads(template_path.read_text())
+    if "idColumns" in tpl:
+        engine_tpl = {k: v for k, v in tpl.items() if k not in ("idColumns", "customLabels")}
+        bubbled = [c for c in tpl["idColumns"] if len(c) > 1]
+        engine_tpl["outputColumns"] = [x for c in tpl["outputColumns"] for x in (bubbled if c == "ID NO" else [c])]
+        (work_root / "template.json").write_text(json.dumps(engine_tpl, indent=2))
+    else:
+        shutil.copy2(template_path, work_root / "template.json")
 
-    # Copy files the template's preprocessors reference (e.g. CropOnMarkers marker image)
-    with open(template_path, "r") as f:
-        for pp in json.load(f).get("preProcessors", []):
-            rel = pp.get("options", {}).get("relativePath")
-            if rel and (template_path.parent / rel).exists():
-                shutil.copy2(template_path.parent / rel, work_root / rel)
+    # CropOnMarkers needs its marker image beside the template. Sheets from
+    # designer/ name one that is not saved with the template, so draw it.
+    for p in tpl.get("preProcessors", []):
+        rel = p.get("options", {}).get("relativePath")
+        if p.get("name") == "CropOnMarkers" and rel:
+            src = template_path.parent / rel
+            if src.exists():
+                shutil.copy2(src, work_root / rel)
+            else:
+                write_marker(work_root / rel)
 
     # Copy config (optional)
     if config_path and config_path.exists():
@@ -105,6 +118,20 @@ def build_work_dir(
             shutil.copy2(f, dst)
 
     return work_root
+
+
+def write_marker(path: Path, size: int = 200) -> None:
+    """Draw the designer's corner marker: black square, white at 62.5%, black at 31.25%.
+    Keep in step with MARKER_RINGS in designer/sheet.js."""
+    import cv2
+    import numpy as np
+
+    img = np.zeros((size, size), np.uint8)
+    for i, k in enumerate((1, 0.625, 0.3125)):
+        a = round(size * k)
+        o = (size - a) // 2
+        img[o:o + a, o:o + a] = 255 if i % 2 else 0
+    cv2.imwrite(str(path), img)
 
 
 def run_omr_engine(work_dir: Path, output_dir: Path) -> Path:
@@ -150,6 +177,7 @@ def clean_csv(
     output_columns: list[str],
     out_path: Path,
     scan_count: int,
+    id_columns: list[str] | None = None,
     id_length: int = 13,
 ) -> None:
     """
@@ -160,6 +188,11 @@ def clean_csv(
 
     df = pd.read_csv(raw_csv_path, dtype=str)
     df.columns = df.columns.str.strip().str.strip('"')
+    if id_columns:  # one-character entries are fixed, the rest are bubbled column labels
+        df = df.fillna("")
+        # a list, not df.apply: apply returns a DataFrame when every sheet failed and df is empty
+        df["ID NO"] = ["".join(c if len(c) == 1 else r.get(c, "") for c in id_columns) for _, r in df.iterrows()]
+    id_len = len(id_columns) if id_columns else id_length
 
     # Determine columns to keep
     keep = ["file_id"] + output_columns
@@ -187,8 +220,8 @@ def clean_csv(
         # ID length check (if ID NO column exists)
         if "ID NO" in output_columns:
             id_val = str(row.get("ID NO", "")).strip()
-            if id_val and len(id_val) != id_length:
-                notes.append(f"ID_LEN({len(id_val)}/{id_length})")
+            if id_val and len(id_val) != id_len:
+                notes.append(f"ID_LEN({len(id_val)}/{id_len})")
 
         # Set check
         if "Set" in output_columns:
@@ -295,7 +328,7 @@ def main():
         # Produce clean CSV
         out_path.parent.mkdir(parents=True, exist_ok=True)
         id_length = len(tpl.get("customLabels", {}).get("ID NO", [])) or 13
-        clean_csv(raw_csv, output_columns, out_path, len(scan_files), id_length)
+        clean_csv(raw_csv, output_columns, out_path, len(scan_files), tpl.get("idColumns"), id_length)
 
         # Copy overlays if requested
         if args.overlays:

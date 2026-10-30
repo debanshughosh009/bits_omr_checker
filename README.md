@@ -14,7 +14,7 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
   │ (sheet+template) │       │     (Stage 1)      │       │   Export (Stage 2)  │
   └──────────────────┘       └────────────────────┘       └─────────────────────┘
      • Questions/options        • Image preprocessing        • Answer key per set
-     • Sets, ID digits          • Marker alignment           • +4/-1 marking, bonus
+     • Sets, BITS ID grid       • Marker alignment           • +4/-1 marking, bonus
      • Printable PDF            • Bubble fill detection      • Multiple-correct answers
      • template.json            • results.csv + flags        • Roster, scores.csv
                     └──────────── Web app (Docker) runs all three ────────────┘
@@ -31,7 +31,7 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
    - Per-set keys, configurable marking, bonus questions, "any one of" and "all of" (multiple-correct) answers with optional partial credit, class roster merge.
 3. **Web App ([`webapp/`](webapp/)):**
    - Browser UI, packaged as a Docker container, that runs the whole pipeline.
-   - **Designer:** generates a printable sheet and its template from the number of questions, options, sets and ID digits, or uploads a custom template.
+   - **Designer:** generates a printable sheet and its template from the number of questions, options and sets (with the BITS ID grid), or uploads a custom template. [`designer/index.html`](designer/) is a standalone version that needs no server.
    - **Professor:** enters the answer key on a clickable grid, uploads scans, fixes flagged sheets, downloads `results.csv` and `scores.csv`.
 4. **Template Utilities ([`scripts/`](scripts/)):**
    - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
@@ -75,7 +75,7 @@ python webapp/app.py            # http://localhost:8000, data in ./data (git-ign
 | Questions | 1–300 | Bubbles shrink automatically to fit one A4 page; the form tells you the maximum if it doesn't fit |
 | Options per question | 2–8 | A–B up to A–H |
 | Question-paper sets | none, 2–8 | Adds a Set bubble row; each set gets its own answer key |
-| Student ID digits | 0–20 | Write-in boxes over a 0–9 bubble grid per digit; 0 leaves out the ID grid |
+| ID number | BITS ID or none | `(F/H/P) 2 0 (0-4) (0-9) (0-9)(0-9)(0-9)(0-9) (H/P/G)`, e.g. `F20231187H`: a write-in box over each column, the "2 0" printed, the rest bubbled. Same format as `designer/` |
 | Title | text | Printed at the top of the sheet |
 
 The preview updates as you type. **Create layout** saves:
@@ -202,7 +202,7 @@ python scans_to_csv/omr_to_csv.py --help
 ### Sheet Designer (command line)
 
 ```bash
-python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --id-digits 10 --title "EEE Quiz 2" --out my_sheet/
+python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --title "EEE Quiz 2" --out my_sheet/   # --id-format none to drop the ID grid
 ```
 
 Writes `sheet.pdf`, `sheet.png`, `template.json`, `config.json`, `omr_marker.png` and `preview.png`.
@@ -235,6 +235,20 @@ Answer key values:
 - `-` or empty: not scored.
 
 See [`scoring/README.md`](scoring/README.md) for key file layouts.
+
+---
+
+### 3. Designing a New Sheet
+
+Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter (`F20231187H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year (0–4, then 0–9), the four digits, and the campus (H/P/G), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
+
+- **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
+- **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
+- **Save draft** / **Open…** keep the form as a `.json` file; the browser also remembers the last draft.
+
+The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. Sheets printed before the designer still use the hand-calibrated `scans_to_csv/template.json`.
+
+`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed.
 
 ---
 
@@ -313,6 +327,10 @@ omr_checker/
 │   ├── run_stage1.py       # Runs Stage 1 without a display (containers)
 │   ├── templates/, static/ # Pages, styles, answer key editor
 │   └── README.md
+├── designer/               # Static sheet designer: open index.html, print the sheet, save template.json
+│   ├── index.html          # Form on the left, A4 sheet on the right
+│   ├── sheet.js            # The layout both the printout and the template come from
+│   └── app.js              # The form
 ├── Dockerfile              # Container for the web app
 ├── docker-compose.yml      # `docker compose up -d --build` -> http://localhost:8000
 ├── docs/                   # Multi-milestone roadmap & documentation
@@ -320,6 +338,7 @@ omr_checker/
 │   ├── bits_omr_README.md  # Sheet layout calibration notes
 │   └── OMRChecker_README.md
 ├── scripts/                # Developer utilities for templates
+│   ├── check_designer.py   # Round trip: designer/ sheet -> filled scan -> CSV
 │   ├── make_template.py    # Generates the BITS template.json
 │   ├── check_template.py   # Visual alignment checker
 │   └── validate_schema.py  # Schema validator
