@@ -87,6 +87,13 @@ def build_work_dir(
     # Copy template
     shutil.copy2(template_path, work_root / "template.json")
 
+    # Copy files the template's preprocessors reference (e.g. CropOnMarkers marker image)
+    with open(template_path, "r") as f:
+        for pp in json.load(f).get("preProcessors", []):
+            rel = pp.get("options", {}).get("relativePath")
+            if rel and (template_path.parent / rel).exists():
+                shutil.copy2(template_path.parent / rel, work_root / rel)
+
     # Copy config (optional)
     if config_path and config_path.exists():
         shutil.copy2(config_path, work_root / "config.json")
@@ -143,6 +150,7 @@ def clean_csv(
     output_columns: list[str],
     out_path: Path,
     scan_count: int,
+    id_length: int = 13,
 ) -> None:
     """
     Read the raw OMRChecker Results CSV and write a clean output CSV.
@@ -179,8 +187,8 @@ def clean_csv(
         # ID length check (if ID NO column exists)
         if "ID NO" in output_columns:
             id_val = str(row.get("ID NO", "")).strip()
-            if id_val and len(id_val) != 13:
-                notes.append(f"ID_LEN({len(id_val)}/13)")
+            if id_val and len(id_val) != id_length:
+                notes.append(f"ID_LEN({len(id_val)}/{id_length})")
 
         # Set check
         if "Set" in output_columns:
@@ -286,7 +294,8 @@ def main():
 
         # Produce clean CSV
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        clean_csv(raw_csv, output_columns, out_path, len(scan_files))
+        id_length = len(tpl.get("customLabels", {}).get("ID NO", [])) or 13
+        clean_csv(raw_csv, output_columns, out_path, len(scan_files), id_length)
 
         # Copy overlays if requested
         if args.overlays:
