@@ -18,7 +18,7 @@ Q_Y0, Q_DY = 1506.0, 56.14
 ID_COLS = [  # per-column printed bubble labels, top -> bottom
     ["2"],                                        # 1  pre-printed
     ["0"],                                        # 2  pre-printed
-    ["1", "2"],                                   # 3  year (hundreds)
+    ["0", "1", "2"],                              # 3  year (tens); 0 keeps rows aligned with 0-9 columns
     list("0123456789"),                           # 4  year (units)
     ["A", "B", "H", "P"],                         # 5  degree/branch letter
     ["1", "2", "3", "4", "5", "7", "8", "A", "H"],# 6

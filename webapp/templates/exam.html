@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.name }} · OMR Checker{% endblock %}
+{% block content %}
+{% set has_key = exam['keys']|length > 0 %}
+{% set has_scores = summary.scores_header|length > 0 %}
+<p class="crumbs"><a href="{{ url_for('professor') }}">Exams</a> /</p>
+<div class="title-row">
+  <h1>{{ exam.name }}</h1>
+  <span class="muted">Layout: {{ layout.name }} · {{ exam.num_questions }} question(s) scored</span>
+</div>
+
+<ol class="progress-steps">
+  <li class="{{ 'done' if has_key }}">
+    <a href="{{ url_for('answer_key', exam_id=exam.id) }}">1. Answer key</a>
+    <span>{% if has_key %}{{ exam['keys']|length }} set(s) entered{% else %}not entered{% endif %}</span>
+  </li>
+  <li class="{{ 'done' if summary.sheets }}">
+    <a href="#upload">2. Upload scans</a>
+    <span>{{ summary.sheets }} sheet(s) read</span>
+  </li>
+  <li class="{{ 'done' if has_scores }}">
+    <a href="#results">3. Scores</a>
+    <span>{% if has_scores %}{{ summary.scored }} scored{% else %}waiting{% endif %}</span>
+  </li>
+</ol>
+
+<section class="card" id="upload">
+  <h2>Upload scans</h2>
+  <form id="upload-form" data-url="{{ url_for('upload_scans', exam_id=exam.id) }}"
+        data-active-job="{{ job.id if job else '' }}">
+    <label class="dropzone" id="dropzone">
+      <input type="file" name="scans" id="scan-input" multiple accept=".png,.jpg,.jpeg,.pdf,.zip">
+      <strong>Drop scans here or click to choose</strong>
+      <span class="muted">JPG, PNG, PDF (multi-page OK) or a ZIP of them. Upload as many batches as you like; they add to this exam.</span>
+      <span id="file-list" class="muted"></span>
+    </label>
+    <div class="btn-row">
+      <button class="btn primary" id="upload-btn" type="submit" disabled>Upload and process</button>
+    </div>
+  </form>
+  <div id="job-box" class="job hidden">
+    <div class="bar"><div class="bar-fill" id="job-bar"></div></div>
+    <p id="job-msg"></p>
+    <ul id="job-unread" class="small"></ul>
+    <details id="job-log-wrap" class="hidden"><summary>Processing log</summary><pre id="job-log"></pre></details>
+  </div>
+</section>
+
+<section class="card" id="results">
+  <div class="title-row">
+    <h2>Results</h2>
+    <div class="btn-row">
+      {% if summary.sheets %}<a class="btn" href="{{ url_for('download', exam_id=exam.id, kind='results') }}">results.csv</a>{% endif %}
+      {% if has_scores %}<a class="btn primary" href="{{ url_for('download', exam_id=exam.id, kind='scores') }}">scores.csv</a>{% endif %}
+    </div>
+  </div>
+
+  {% if not summary.sheets %}
+    <p class="muted">No scans yet. Upload some above.</p>
+  {% else %}
+    {% if not has_key %}
+      <div class="flash warn">Scans are read, but there is no answer key yet. <a href="{{ url_for('answer_key', exam_id=exam.id) }}">Enter the answer key</a> to get scores.</div>
+    {% endif %}
+    {% if has_scores %}
+    <div class="stats">
+      <div><b>{{ summary.scored }}</b><span>scored</span></div>
+      <div><b>{{ summary.mean }}</b><span>mean</span></div>
+      <div><b>{{ summary.max|round(2) }}</b><span>highest</span></div>
+      <div><b>{{ summary.min|round(2) }}</b><span>lowest</span></div>
+      <div class="{{ 'warn' if summary.flagged }}"><b>{{ summary.flagged }}</b><span>to review</span></div>
+    </div>
+    {% endif %}
+
+    <div class="toolbar">
+      <input type="search" id="table-search" placeholder="Search ID, name, file...">
+      <label><input type="checkbox" id="only-flagged"> Only flagged</label>
+      {% if has_scores %}<label><input type="checkbox" id="show-questions"> Show per-question</label>{% endif %}
+    </div>
+
+    <div class="table-wrap">
+    {% if has_scores %}
+      {% set hdr = summary.scores_header %}
+      {% set roster_cols = hdr[2:hdr.index('set')] %}
+      <table class="table results" id="results-table">
+        <thead><tr>
+          <th>Scan</th><th>Student ID</th>
+          {% for c in roster_cols %}<th>{{ c }}</th>{% endfor %}
+          <th>Set</th><th>Score</th><th>%</th>
+          <th title="correct / wrong / blank / multi-marked / partial">C / W / B / M / P</th>
+          <th>Check</th>
+          {% for q in questions %}<th class="qcol">{{ q[1:] }}</th>{% endfor %}
+          <th></th>
+        </tr></thead>
+        <tbody>
+        {% for r in summary.scores %}
+          <tr class="{{ 'flagged' if r.check }}">
+            <td>{% if r.image_id %}<a href="{{ url_for('scan_image', exam_id=exam.id, file_id=r.image_id) }}" target="_blank">{{ r.image_id }}</a>{% else %}<span class="muted">none</span>{% endif %}</td>
+            <td class="mono">{{ r.student_id }}</td>
+            {% for c in roster_cols %}<td>{{ r[c] }}</td>{% endfor %}
+            <td>{{ r.set }}</td>
+            <td><b>{{ r.score }}</b>{% if r.score != '' %}<span class="muted"> / {{ r.max_score }}</span>{% endif %}</td>
+            <td>{{ r.percentage }}</td>
+            <td class="mono">{% if r.score != '' %}{{ r.correct }} / {{ r.wrong }} / {{ r.blank }} / {{ r.multi }} / {{ r.partial }}{% endif %}</td>
+            <td class="check">{{ r.check }}</td>
+            {% for q in questions %}<td class="qcol q-{{ r[q] }}">{{ r[q] }}</td>{% endfor %}
+            <td class="actions">{% if r.image_id %}
+              <a href="{{ url_for('edit_sheet', exam_id=exam.id, file_id=r.image_id) }}">Fix</a>
+              <form method="post" action="{{ url_for('delete_sheet', exam_id=exam.id, file_id=r.image_id) }}" onsubmit="return confirm('Remove {{ r.image_id }} from this exam?')"><button class="link-btn">Remove</button></form>
+            {% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <table class="table results" id="results-table">
+        <thead><tr><th>Scan</th><th>Student ID</th><th>Set</th><th>Answers</th><th>Check</th><th></th></tr></thead>
+        <tbody>
+        {% for r in summary.results %}
+          <tr class="{{ 'flagged' if r.check }}">
+            <td><a href="{{ url_for('scan_image', exam_id=exam.id, file_id=r.file_id) }}" target="_blank">{{ r.file_id }}</a></td>
+            <td class="mono">{{ r['ID NO'] }}</td>
+            <td>{{ r.Set }}</td>
+            <td class="mono small">{% for q in questions %}{{ r[q] or '·' }}{% if not loop.last %} {% endif %}{% endfor %}</td>
+            <td class="check">{{ r.check }}</td>
+            <td class="actions">
+              <a href="{{ url_for('edit_sheet', exam_id=exam.id, file_id=r.file_id) }}">Fix</a>
+              <form method="post" action="{{ url_for('delete_sheet', exam_id=exam.id, file_id=r.file_id) }}" onsubmit="return confirm('Remove {{ r.file_id }} from this exam?')"><button class="link-btn">Remove</button></form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+    </div>
+    <p class="muted small">Flags: <b>MULTI</b> more than one option marked · <b>ID_LEN</b> incomplete ID · <b>NO_SET</b> set not marked · <b>DUPLICATE_ID</b> same ID on several sheets · <b>NOT_IN_ROSTER</b> / <b>ABSENT</b> roster mismatches · <b>REVIEWED</b> corrected by hand. Counts and per-question: C correct, W wrong, B blank, M more than one option marked, P partial credit (multiple-correct questions).</p>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card" id="settings">
+    <h2>Settings</h2>
+    <form method="post" action="{{ url_for('exam_settings', exam_id=exam.id) }}" enctype="multipart/form-data" class="form">
+      <label>Exam name <input name="name" value="{{ exam.name }}"></label>
+      <div class="inline-fields">
+        <label>Correct <input type="number" step="any" name="correct" value="{{ exam.marking.correct }}"></label>
+        <label>Wrong <input type="number" step="any" name="wrong" value="{{ exam.marking.wrong }}"></label>
+        <label>Blank <input type="number" step="any" name="blank" value="{{ exam.marking.blank }}"></label>
+      </div>
+      <label>More than one option marked on a single-answer question
+        <select name="multi">
+          <option value="wrong" {{ 'selected' if exam.marking.multi == 'wrong' }}>count as wrong</option>
+          <option value="blank" {{ 'selected' if exam.marking.multi == 'blank' }}>count as blank</option>
+        </select>
+      </label>
+      <label class="inline"><input type="checkbox" name="partial" value="1" {{ 'checked' if exam.marking.partial }}>
+        Partial credit on multiple-correct questions <span class="muted">(marking some of the correct options and no wrong one earns a share of the marks)</span></label>
+      <label>Class roster CSV <span class="muted">optional: an ID column (e.g. <code>student_id</code>) plus any details like name, section</span>
+        <input type="file" name="roster" accept=".csv">
+      </label>
+      {% if exam.roster %}
+        <p class="small">Roster loaded · <a href="{{ url_for('download', exam_id=exam.id, kind='roster') }}">download</a> ·
+          <label class="inline"><input type="checkbox" name="remove_roster" value="1"> remove</label></p>
+      {% endif %}
+      <button class="btn primary">Save settings and rescore</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Upload history</h2>
+    {% if exam.history %}
+    <table class="table compact">
+      <thead><tr><th>Time</th><th>Files</th><th>Read</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for h in exam.history %}
+        <tr>
+          <td class="muted">{{ h.time }}</td><td>{{ h.files }}</td><td>{{ h.read }}</td>
+          <td>{% if h.status == 'done' and not h.unread %}<span class="pill ok">ok</span>{% elif h.status == 'done' %}<span class="pill warn" title="{{ h.unread|join(', ') }}">{{ h.unread|length }} unread</span>{% else %}<span class="pill bad">failed</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">Nothing uploaded yet.</p>
+    {% endif %}
+
+    <h3>Danger zone</h3>
+    <div class="btn-row">
+      <form method="post" action="{{ url_for('rescore', exam_id=exam.id) }}"><button class="btn">Rescore now</button></form>
+      <form method="post" action="{{ url_for('delete_exam', exam_id=exam.id) }}" onsubmit="return confirm('Delete this exam and all its scans and results?')"><button class="btn danger">Delete exam</button></form>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='exam.js') }}"></script>{% endblock %}

@@ -45,6 +45,7 @@ work/
 _omr_work*/
 temp/
 tmp/
+data/
 
 # Result spreadsheets and data exports
 results.csv

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Designer · OMR Checker{% endblock %}
+{% block content %}
+<h1>Sheet layouts</h1>
+
+<div class="grid-2 wide-right">
+  <section class="card">
+    <h2>Design a new sheet</h2>
+    <p class="muted small">Pick the numbers and get a printable sheet with its template. Scans of the printed sheet can be read straight away.</p>
+    <form method="post" action="{{ url_for('generate_layout') }}" class="form" id="design-form"
+          data-preview-url="{{ url_for('design_preview') }}">
+      <label>Title printed on the sheet <input name="title" value="{{ form.title }}" placeholder="Answer Sheet" maxlength="80"></label>
+      <div class="inline-fields">
+        <label>Questions
+          <input type="number" name="questions" min="{{ limits.questions[0] }}" max="{{ limits.questions[1] }}" value="{{ form.questions }}" required></label>
+        <label>Options per question
+          <select name="options">
+            {% for n in range(limits.options[0], limits.options[1] + 1) %}
+              <option value="{{ n }}" {{ 'selected' if form.options|int == n }}>{{ n }} (A–{{ 'ABCDEFGH'[n - 1] }})</option>
+            {% endfor %}
+          </select></label>
+      </div>
+      <div class="inline-fields">
+        <label>Question-paper sets
+          <select name="sets">
+            <option value="0" {{ 'selected' if form.sets|int == 0 }}>none</option>
+            {% for n in range(2, limits.sets[1] + 1) %}
+              <option value="{{ n }}" {{ 'selected' if form.sets|int == n }}>{{ n }} (A–{{ 'ABCDEFGH'[n - 1] }})</option>
+            {% endfor %}
+          </select></label>
+        <label>Student ID digits
+          <input type="number" name="id_digits" min="{{ limits.id_digits[0] }}" max="{{ limits.id_digits[1] }}" value="{{ form.id_digits }}"></label>
+      </div>
+      <label>Layout name <span class="muted">shown to professors; defaults to the title</span>
+        <input name="name" value="{{ form.name }}" placeholder="e.g. EEE quiz 40Q 5 options"></label>
+      <p id="design-error" class="flash error hidden"></p>
+      <button class="btn primary">Create layout</button>
+    </form>
+    <p class="muted small">Up to {{ limits.questions[1] }} questions on one A4 page. Bubbles shrink automatically when there are many questions. Set the ID digits to 0 to leave out the ID grid. IDs are digits only; for IDs with letters (like BITS IDs), upload a custom template below.</p>
+  </section>
+
+  <section class="card">
+    <h2>Preview</h2>
+    <p class="muted small">Green boxes show where the reader looks; red circles are the corner markers used to straighten scans.</p>
+    <div class="preview-wrap"><img id="design-preview" class="preview" alt="Sheet preview"></div>
+  </section>
+</div>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Layouts</h2>
+    {% if layouts %}
+    <table class="table">
+      <thead><tr><th>Name</th><th>Questions</th><th>Sets</th><th>Source</th><th>Created</th></tr></thead>
+      <tbody>
+      {% for l in layouts %}
+        <tr>
+          <td><a href="{{ url_for('layout_detail', layout_id=l.id) }}">{{ l.name }}</a></td>
+          <td>{{ l.info.questions|length }} × {{ l.info.all_options|join('') }}</td>
+          <td>{{ l.info.sets|join(', ') or 'none' }}</td>
+          <td>{{ 'designed' if l.generated else 'uploaded' }}</td>
+          <td class="muted">{{ l.created }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">No layouts yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Upload a custom template</h2>
+    <form method="post" action="{{ url_for('create_layout') }}" enctype="multipart/form-data" class="form">
+      <label>Name <input name="name" required placeholder="e.g. BITS Hyderabad 30Q v2"></label>
+      <label>template.json <span class="req">required</span>
+        <input type="file" name="template" accept=".json" required></label>
+      <label>config.json <span class="muted">optional, detection thresholds</span>
+        <input type="file" name="config" accept=".json"></label>
+      <label>Blank sheet <span class="muted">optional PNG / JPG / PDF, for printing and preview</span>
+        <input type="file" name="sheet" accept=".png,.jpg,.jpeg,.pdf"></label>
+      <label>Template files <span class="muted">files the template refers to, e.g. the marker image for CropOnMarkers</span>
+        <input type="file" name="assets" multiple></label>
+      <button class="btn">Upload layout</button>
+    </form>
+    <p class="muted small">Templates use the OMRChecker format (see <code>scripts/make_template.py</code>). They need question columns <code>q1</code>, <code>q2</code>, … in <code>outputColumns</code>. A field labelled <code>Set</code> enables a separate key per set.</p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='designer.js') }}"></script>{% endblock %}
