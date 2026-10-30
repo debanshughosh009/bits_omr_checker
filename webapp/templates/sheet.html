@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Fix {{ row.file_id }} · OMR Checker{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('professor') }}">Exams</a> / <a href="{{ url_for('exam_detail', exam_id=exam.id) }}#results">{{ exam.name }}</a> /</p>
+<h1>Fix {{ row.file_id }}</h1>
+{% if row.check %}<div class="flash warn">Flags: {{ row.check }}</div>{% endif %}
+
+<div class="grid-2 wide-left">
+  <section class="card">
+    <a href="{{ url_for('scan_image', exam_id=exam.id, file_id=row.file_id) }}" target="_blank">
+      <img class="preview" src="{{ url_for('scan_image', exam_id=exam.id, file_id=row.file_id) }}" alt="Scan">
+    </a>
+  </section>
+  <section class="card">
+    <form method="post" class="form">
+      <div class="inline-fields">
+        {% if 'Set' in header %}
+        <label>Set
+          {% if info.sets %}
+          <select name="Set">
+            <option value="" {{ 'selected' if not row.Set }}>(blank)</option>
+            {% for s in info.sets %}<option {{ 'selected' if row.Set == s }}>{{ s }}</option>{% endfor %}
+          </select>
+          {% else %}<input name="Set" value="{{ row.Set }}">{% endif %}
+        </label>
+        {% endif %}
+        {% if 'ID NO' in header %}
+        <label class="grow">Student ID <input name="ID NO" value="{{ row['ID NO'] }}" class="mono"></label>
+        {% endif %}
+      </div>
+      <p class="muted small">Answers: leave blank if unmarked; type two letters (e.g. <code>AB</code>) for a multi-mark.</p>
+      <div class="answer-grid">
+        {% for q in info.questions %}
+          <label class="{{ 'multi' if row[q]|length > 1 }}"><span>{{ q[1:] }}</span>
+            <input name="{{ q }}" value="{{ row[q] }}" maxlength="{{ info.options[q]|length }}" class="mono"></label>
+        {% endfor %}
+      </div>
+      <div class="btn-row">
+        <button class="btn primary">Save and rescore</button>
+        <a class="btn" href="{{ url_for('exam_detail', exam_id=exam.id) }}#results">Cancel</a>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

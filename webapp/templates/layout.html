@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ layout.name }} · OMR Checker{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('designer') }}">Layouts</a> /</p>
+<h1>{{ layout.name }}</h1>
+
+<div class="grid-2 wide-right">
+  <section class="card">
+    <h2>Summary</h2>
+    <dl class="facts">
+      <dt>Source</dt><dd>{% if layout.generated %}designed here{% else %}uploaded template{% endif %}</dd>
+      <dt>Questions</dt><dd>{{ layout.info.questions|length }} ({{ layout.info.questions[0] }}–{{ layout.info.questions[-1] }})</dd>
+      <dt>Options</dt><dd>{{ layout.info.all_options|join(', ') }}</dd>
+      <dt>Sets</dt><dd>{{ layout.info.sets|join(', ') or 'none (one key for all sheets)' }}</dd>
+      <dt>Student ID</dt><dd>{{ layout.info.id_length ~ ' characters' if layout.info.id_length else 'not on this sheet' }}</dd>
+      {% if layout.generated %}
+      <dt>Sheet</dt><dd>A4, {{ layout.generated.columns }} column(s) × {{ layout.generated.rows }} row(s), corner markers</dd>
+      {% else %}
+      <dt>Page size</dt><dd>{{ layout.info.page|join(' × ') }} px</dd>
+      {% endif %}
+      <dt>Field blocks</dt><dd>{{ layout.info.blocks }}</dd>
+      <dt>Created</dt><dd>{{ layout.created }}</dd>
+      <dt>Used by</dt><dd>{{ in_use|join(', ') or 'no exams' }}</dd>
+    </dl>
+
+    <h3>Downloads</h3>
+    <div class="btn-row">
+      {% if layout.sheet %}<a class="btn primary" href="{{ url_for('layout_file', layout_id=layout.id, name=layout.sheet) }}">Blank sheet to print ({{ layout.sheet.rsplit('.', 1)[1]|upper }})</a>{% endif %}
+      <a class="btn" href="{{ url_for('layout_bundle', layout_id=layout.id) }}">Everything (ZIP)</a>
+    </div>
+    <ul class="file-list small">
+      {% for f in files %}<li><a href="{{ url_for('layout_file', layout_id=layout.id, name=f) }}">{{ f }}</a></li>{% endfor %}
+    </ul>
+    {% if layout.generated %}
+    <p class="muted small">Print at 100% scale ("actual size") on A4 and keep the four corner squares visible when scanning.</p>
+    {% endif %}
+
+    <h3>Delete</h3>
+    {% if in_use %}
+      <p class="muted small">This layout is in use and can't be deleted.</p>
+    {% else %}
+      <form method="post" action="{{ url_for('delete_layout', layout_id=layout.id) }}">
+        <button class="btn danger" onclick="return confirm('Delete this layout?')">Delete layout</button>
+      </form>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Bubble preview</h2>
+    <p class="muted small">Green boxes are where the reader looks for each bubble.
+      {% if layout.generated %}Red circles mark the corner markers used to straighten scans.
+      {% elif not layout.sheet %}Upload a blank sheet with the layout to see them on the real page.
+      {% else %}They should sit on the printed circles.{% endif %}</p>
+    <a href="{{ url_for('layout_file', layout_id=layout.id, name='preview.png') }}" target="_blank">
+      <img class="preview" src="{{ url_for('layout_file', layout_id=layout.id, name='preview.png') }}" alt="Template preview">
+    </a>
+  </section>
+</div>
+{% endblock %}

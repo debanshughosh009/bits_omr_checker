@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Professor · OMR Checker{% endblock %}
+{% block content %}
+<h1>Exams</h1>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Your exams</h2>
+    {% if exams %}
+    <table class="table">
+      <thead><tr><th>Exam</th><th>Layout</th><th>Key</th><th>Sheets</th><th>Created</th></tr></thead>
+      <tbody>
+      {% for e in exams %}
+        <tr>
+          <td><a href="{{ url_for('exam_detail', exam_id=e.id) }}">{{ e.name }}</a></td>
+          <td class="muted">{{ e.layout }}</td>
+          <td>{% if e['keys'] %}<span class="pill ok">{{ e['keys']|length }} set(s)</span>{% else %}<span class="pill warn">missing</span>{% endif %}</td>
+          <td>{{ e.sheets }}</td>
+          <td class="muted">{{ e.created }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">No exams yet. Create one to get started.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>New exam</h2>
+    {% if layouts %}
+    <form method="post" action="{{ url_for('create_exam') }}" class="form">
+      <label>Exam name <input name="name" required placeholder="e.g. EEE F111 Quiz 1"></label>
+      <label>Sheet layout
+        <select name="layout" required>
+          {% for l in layouts %}
+            <option value="{{ l.id }}">{{ l.name }} ({{ l.info.questions|length }}Q{% if l.info.sets %}, sets {{ l.info.sets|join('') }}{% endif %})</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn primary">Create and enter answer key</button>
+    </form>
+    {% else %}
+      <p>No sheet layouts yet. Ask the designer to <a href="{{ url_for('designer') }}">add one</a>.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

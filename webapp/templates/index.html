@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>OMR Checker</h1>
+<p class="muted">Design a sheet layout, enter the answer key, upload scans, and download the scores.</p>
+
+<div class="cards two">
+  <a class="card link" href="{{ url_for('designer') }}">
+    <h2>Designer</h2>
+    <p>Design a printable sheet by choosing the number of questions, options, sets and ID digits, or upload your own <code>template.json</code>. Check the bubble preview.</p>
+    <span class="muted">{{ layouts|length }} layout(s)</span>
+  </a>
+  <a class="card link" href="{{ url_for('professor') }}">
+    <h2>Professor</h2>
+    <p>Create an exam, click in the answer key, upload scans (single, batch or ZIP), and download <code>results.csv</code> and <code>scores.csv</code>.</p>
+    <span class="muted">{{ exams|length }} exam(s)</span>
+  </a>
+</div>
+
+<h2>How it works</h2>
+<ol class="steps">
+  <li><b>Designer</b> generates a sheet (PDF to print + template), uploads a custom template, or uses the built-in BITS Hyderabad 30Q layout.</li>
+  <li><b>Professor</b> creates an exam on that layout and clicks in the answer key for each set, including questions with multiple correct options.</li>
+  <li>Upload scans. Each sheet is read into <code>results.csv</code> (marked options per student).</li>
+  <li>Scores are compiled into <code>scores.csv</code>: student ID, roster details, set, score, counts and review flags.</li>
+  <li>Fix flagged sheets in the browser. Scores update automatically when the key, marking or a sheet changes.</li>
+</ol>
+{% endblock %}

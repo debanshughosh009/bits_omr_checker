@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Answer key · {{ exam.name }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('professor') }}">Exams</a> / <a href="{{ url_for('exam_detail', exam_id=exam.id) }}">{{ exam.name }}</a> /</p>
+<div class="title-row">
+  <h1>Answer key</h1>
+  <label class="inline">Questions in this exam
+    <input type="number" id="num-questions" min="1" max="{{ info.questions|length }}" value="{{ exam.num_questions }}">
+    <span class="muted">of {{ info.questions|length }} on the sheet</span>
+  </label>
+</div>
+
+<section class="card">
+  <div id="set-tabs" class="tabs"></div>
+
+  <div class="toolbar">
+    <span class="muted">Clicking an option</span>
+    <label class="inline"><input type="radio" name="click-mode" value="one" checked> sets one answer</label>
+    <label class="inline"><input type="radio" name="click-mode" value="many"> selects several</label>
+    <span class="sep"></span>
+    <label class="inline">Several selected means
+      <select id="default-mode">
+        <option value="all">all must be marked</option>
+        <option value="any">any one is accepted</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="toolbar">
+    <input id="quick-fill" class="mono grow" placeholder="Quick fill, e.g. ABCDDCBA… or A, B, A/C, B+D, *, -">
+    <button class="btn" id="quick-apply">Fill</button>
+    <span class="sep"></span>
+    <select id="copy-target"></select>
+    <button class="btn" id="copy-btn">Copy this set</button>
+    <button class="btn" id="clear-btn">Clear set</button>
+  </div>
+
+  <details class="help small">
+    <summary>How to enter answers</summary>
+    <ul>
+      <li><b>One correct option:</b> click it.</li>
+      <li><b>Multiple correct options:</b> Shift+click (or switch to "selects several") to pick more than one. The chip on the row says what it means:
+        <span class="mode all">all</span> the student must mark exactly these options;
+        <span class="mode any">any</span> any one of them earns the marks. Click the chip to switch.</li>
+      <li><b>★ Bonus:</b> everyone gets the marks for that question.</li>
+      <li><b>Keyboard:</b> click a row and type the option letter. In "sets one answer" mode it moves to the next question; <b>Shift</b>+letter adds an option, <b>*</b> bonus, <b>Backspace</b> clears, <b>↑ ↓ Enter</b> move.</li>
+      <li><b>Quick fill:</b> one answer per question, e.g. <code>ABCD…</code>, or comma separated: <code>A/C</code> either, <code>A+C</code> both, <code>*</code> bonus, <code>-</code> skip.</li>
+      <li>Partial credit for "all" questions can be turned on in the exam settings.</li>
+    </ul>
+  </details>
+
+  <div id="key-grid" class="key-grid"></div>
+</section>
+
+<div class="savebar">
+  <span id="key-status" class="muted"></span>
+  <a class="btn" href="{{ url_for('exam_detail', exam_id=exam.id) }}">Back to exam</a>
+  <button class="btn primary" id="save-btn">Save answer key</button>
+</div>
+
+<script id="key-data" type="application/json">{{ {
+  "questions": info.questions,
+  "options": info.options,
+  "sets": info.sets,
+  "keys": exam['keys'],
+  "num_questions": exam.num_questions,
+  "save_url": url_for('answer_key', exam_id=exam.id),
+  "exam_url": url_for('exam_detail', exam_id=exam.id),
+}|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='key.js') }}"></script>{% endblock %}
