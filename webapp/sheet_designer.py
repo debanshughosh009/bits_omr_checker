@@ -1,372 +1,257 @@
 """
-Generate a printable OMR sheet and its matching template from a few numbers.
+Make a printable OMR sheet and its template with designer/sheet.js.
 
-    python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --out my_sheet/
+designer/sheet.js owns the layout, the printed sheet (SVG) and the template,
+for designer/index.html and for this module alike, so a sheet made in the web
+app is the same sheet designer/index.html prints. This module runs sheet.js
+with node and turns its SVG into a PDF and PNG.
 
-Writes sheet.pdf (print this), sheet.png, template.json, config.json,
-omr_marker.png and preview.png. The sheet has four corner markers; the
-template uses OMRChecker's CropOnMarkers preprocessor to straighten scans
-with them, so template coordinates are measured from the marker centres.
+    python webapp/sheet_designer.py --out my_sheet/ [--draft draft.json] [--questions 40 --options ABCDE ...]
 
-The ID grid and marker follow designer/sheet.js: ID_COLUMNS lists each ID
-column's symbols, a one-symbol column is printed rather than bubbled, and the
-template's "idColumns" tells scans_to_csv/omr_to_csv.py how to rebuild "ID NO".
+--draft takes a draft saved from designer/index.html ("Save"). Writes sheet.pdf
+(print at 100%), sheet.png, template.json, omr_marker.png, preview.png and
+draft.json.
 """
 
 import argparse
-import io
 import json
-import math
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import matplotlib
-from PIL import Image, ImageDraw, ImageFont
+import pymupdf
 
-# Page: A4 portrait. 1640 px wide = 198.3 dpi; chosen so the marker crop is
-# exactly 1/20 of the page width (CropOnMarkers takes an integer ratio).
-PAGE_W, PAGE_H = 1640, 2320
-DPI = PAGE_W / 8.27
-MARKER_RATIO = 20
-MARKER_CROP = PAGE_W // MARKER_RATIO      # 82 px marker image, incl. white margin
-MARKER_SIZE = 62                          # printed black square
-MARKER_INSET = 75                         # marker centre distance from page edge
-FRAME = (PAGE_W - 2 * MARKER_INSET, PAGE_H - 2 * MARKER_INSET)  # template pageDimensions
+REPO = Path(__file__).resolve().parent.parent
+SHEET_JS = REPO / "designer" / "sheet.js"
+sys.path.insert(0, str(REPO / "scans_to_csv"))
+from omr_to_csv import write_marker  # noqa: E402  (the marker sheet.js prints)
 
-X0, X1 = 130, PAGE_W - 130                # content area
-Y_TOP, Y_BOTTOM = 120, PAGE_H - 140
+MM = 72 / 25.4          # PDF points per millimetre (sheet.js works in mm)
+PNG_DPI = 200
 
-LIMITS = {"questions": (1, 300), "options": (2, 8), "sets": (0, 8)}
-OPTION_LETTERS = "ABCDEFGH"
-SET_LETTERS = "ABCDEFGH"
+# The designer form's settings (designer/index.html), by type
+TEXT_FIELDS = ("title", "exam", "course", "date", "instructions", "sets", "idTitle", "options")
+BOOL_FIELDS = ("showSet",)
+INT_FIELDS = ("questions",)
 
-# BITS ID number, same columns as designer/sheet.js:
-# (F/H/P) 2 0 (0-4) (0-9)  (0-9)(0-9)(0-9)(0-9)  (H/P/G), e.g. F20231187H
-D = "0123456789"
-ID_COLUMNS = ["FHP", "2", "0", "01234", D, D, D, D, D, "HPG"]
-ID_FORMATS = {"bits": ID_COLUMNS, "none": []}
-# Concentric marker, as designer/sheet.js MARKER_RINGS and omr_to_csv.write_marker
-MARKER_RINGS = (1, 0.625, 0.3125)
-
-# Question grid sizes tried from roomiest to most compact:
-# (row pitch, bubble diameter, detection box)
-QUESTION_SIZES = [(48, 36, 30), (44, 34, 28), (40, 32, 26), (36, 28, 23), (32, 25, 21)]
-GROUP = 5           # questions per group; a small gap separates groups
-GROUP_GAP = 12
-NUM_W = 62          # width reserved for the question number
-COL_GAP = 48
-
-ID_PITCH_X, ID_PITCH_Y, ID_D, ID_BOX = 46, 44, 34, 28
-SET_PITCH, SET_D, SET_BOX = 54, 36, 30
-
-INK = 0
-LINE = 70
-FAINT = 150
+_DUMP = """
+const S = require(process.argv[1]);
+const s = { ...S.defaults(), ...JSON.parse(process.argv[2]) };
+const L = S.layout(s);
+process.stdout.write(JSON.stringify({
+  settings: s, svg: S.sheetSvg(L), template: S.template(L),
+  issues: L.issues, fit: L.fit, markers: L.markers,
+}));
+"""
 
 
 class DesignError(ValueError):
     pass
 
 
-def _font(size: int, bold: bool = False):
-    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    path = Path(matplotlib.get_data_path()) / "fonts" / "ttf" / name
-    return ImageFont.truetype(str(path), size)
+def node_path() -> str:
+    node = shutil.which("node")
+    if not node:
+        raise DesignError("Node.js is needed to run designer/sheet.js; install it or use the Docker image.")
+    return node
 
 
-def _text(draw, xy, text, size, fill=INK, bold=False, anchor="la"):
-    draw.text(xy, text, fill=fill, font=_font(size, bold), anchor=anchor)
+def clean_settings(raw: dict) -> dict:
+    """Keep only the designer's settings, with the right types."""
+    out = {}
+    for k in TEXT_FIELDS:
+        if raw.get(k) is not None:
+            out[k] = str(raw[k])
+    for k in BOOL_FIELDS:
+        if k in raw:
+            v = raw[k]
+            out[k] = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on", "yes")
+    for k in INT_FIELDS:
+        if k in raw and str(raw[k]).strip():
+            try:
+                out[k] = int(raw[k])
+            except (TypeError, ValueError):
+                raise DesignError(f"{k.capitalize()} must be a whole number")
+    return out
 
 
-def _bubble(draw, cx, cy, d, label):
-    r = d / 2
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=LINE, width=2, fill=255)
-    _text(draw, (cx, cy), label, max(10, int(d * 0.5)), fill=FAINT, anchor="mm")
+def run_sheet_js(settings: dict) -> dict:
+    """Run designer/sheet.js: settings -> {settings, svg, template, issues, fit, markers}."""
+    proc = subprocess.run([node_path(), "-e", _DUMP, str(SHEET_JS), json.dumps(clean_settings(settings))],
+                          capture_output=True, text=True, encoding="utf-8")
+    if proc.returncode != 0:
+        raise DesignError(f"designer/sheet.js failed: {proc.stderr.strip()[-500:]}")
+    return json.loads(proc.stdout)
 
 
-def _marker(draw, cx, cy):
-    for i, k in enumerate(MARKER_RINGS):
-        s = MARKER_SIZE * k / 2
-        draw.rectangle([cx - s, cy - s, cx + s, cy + s], fill=255 if i % 2 else INK)
+def defaults() -> dict:
+    return run_sheet_js({})["settings"]
 
 
-def _box(cx, cy, box):
-    """Template origin (top-left of the detection box) in frame coordinates."""
-    return [round(cx - box / 2 - MARKER_INSET), round(cy - box / 2 - MARKER_INSET)]
+# ---------------------------------------------------------------------------
+# SVG (from sheetSvg) -> PDF. MuPDF's own SVG import ignores font-family and
+# sets every word in Times, so draw sheetSvg's elements with Helvetica instead.
+# sheetSvg only emits rect, line, circle and text with explicit attributes.
+# ---------------------------------------------------------------------------
+
+def _color(value):
+    if not value or value == "none":
+        return None
+    v = value.lstrip("#")
+    if len(v) == 3:
+        v = "".join(c * 2 for c in v)
+    return tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
 
 
-def _range_label(prefix, a, b):
-    return f"{prefix}{a}" if a == b else f"{prefix}{a}..{b}"
+def svg_to_pdf(svg: str) -> bytes:
+    root = ET.fromstring(svg)
+    ns = "{http://www.w3.org/2000/svg}"
+    vb = [float(x) for x in root.get("viewBox").split()]
+    doc = pymupdf.open()
+    page = doc.new_page(width=vb[2] * MM, height=vb[3] * MM)
+    num = lambda el, k, d=0.0: float(el.get(k, d))
+    for el in root:
+        tag = el.tag.replace(ns, "")
+        if tag == "rect":
+            x, y = num(el, "x"), num(el, "y")
+            rect = pymupdf.Rect(x * MM, y * MM, (x + num(el, "width")) * MM, (y + num(el, "height")) * MM)
+            fill, stroke = _color(el.get("fill", "#000")), _color(el.get("stroke"))
+            page.draw_rect(rect, color=stroke, fill=fill, width=num(el, "stroke-width") * MM if stroke else 0)
+        elif tag == "line":
+            page.draw_line((num(el, "x1") * MM, num(el, "y1") * MM), (num(el, "x2") * MM, num(el, "y2") * MM),
+                           color=_color(el.get("stroke", "#000")), width=num(el, "stroke-width", 1) * MM)
+        elif tag == "circle":
+            page.draw_circle((num(el, "cx") * MM, num(el, "cy") * MM), num(el, "r") * MM,
+                             color=_color(el.get("stroke")), fill=_color(el.get("fill")),
+                             width=num(el, "stroke-width") * MM)
+        elif tag == "text":
+            text = "".join(el.itertext())
+            if not text:
+                continue
+            font = "hebo" if el.get("font-weight") == "bold" else "helv"
+            size = num(el, "font-size") * MM
+            x, y = num(el, "x") * MM, num(el, "y") * MM
+            anchor = el.get("text-anchor", "start")
+            if anchor in ("middle", "end"):
+                w = pymupdf.get_text_length(text, fontname=font, fontsize=size)
+                x -= w / 2 if anchor == "middle" else w
+            page.insert_text((x, y), text, fontname=font, fontsize=size, color=_color(el.get("fill", "#000")))
+    data = doc.tobytes(deflate=True, garbage=3)
+    doc.close()
+    return data
 
 
-def validate(questions, options, sets, id_format, title):
-    for name, val in (("questions", questions), ("options", options), ("sets", sets)):
-        lo, hi = LIMITS[name]
-        if not isinstance(val, int) or not lo <= val <= hi:
-            raise DesignError(f"{name.capitalize()} must be between {lo} and {hi}")
-    if id_format not in ID_FORMATS:
-        raise DesignError(f"ID format must be one of: {', '.join(ID_FORMATS)}")
-    if len(title) > 80:
-        raise DesignError("Title must be at most 80 characters")
+def pdf_to_png(pdf: bytes, dpi: int = PNG_DPI) -> bytes:
+    with pymupdf.open("pdf", pdf) as doc:
+        return doc[0].get_pixmap(dpi=dpi).tobytes("png")
 
 
-def plan_questions(n, k, top):
-    """Pick the roomiest grid that fits n questions with k options below y=top."""
-    avail_h = Y_BOTTOM - top
-    avail_w = X1 - X0
-    for rp, d, box in QUESTION_SIZES:
-        op = d + 12
-        col_w = NUM_W + k * op
-        cols_max = (avail_w + COL_GAP) // (col_w + COL_GAP)
-        rows_max = 0
-        while (rows_max + 1) * rp + (rows_max // GROUP) * GROUP_GAP <= avail_h:
-            rows_max += 1
-        if cols_max < 1 or rows_max < 1:
-            continue
-        if n <= cols_max * rows_max:
-            cols = math.ceil(n / rows_max)
-            rows = math.ceil(n / cols)
-            return {"rp": rp, "d": d, "box": box, "op": op, "col_w": col_w, "cols": cols, "rows": rows}
-    # Report what does fit with the most compact size
-    rp, d, box = QUESTION_SIZES[-1]
-    col_w = NUM_W + k * (d + 12)
-    cols_max = max(0, (avail_w + COL_GAP) // (col_w + COL_GAP))
-    rows_max = 0
-    while (rows_max + 1) * rp + (rows_max // GROUP) * GROUP_GAP <= avail_h:
-        rows_max += 1
-    raise DesignError(
-        f"{n} questions with {k} options don't fit on one page with this header; "
-        f"the maximum is {cols_max * rows_max}. Reduce questions or options."
-    )
+def expand_labels(labels):
+    out = []
+    for label in labels:
+        m = re.fullmatch(r"([^\.\d]+)(\d+)\.{2,3}(\d+)", label)
+        out += [f"{m[1]}{i}" for i in range(int(m[2]), int(m[3]) + 1)] if m else [label]
+    return out
+
+
+def preview_png(png: bytes, out: dict) -> bytes:
+    """The sheet with the template's bubble boxes (green) and marker centres (red) drawn on it."""
+    import cv2
+    import numpy as np
+
+    img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
+    tpl, markers = out["template"], out["markers"]
+    px_per_mm = PNG_DPI / 25.4
+    x0, y0 = min(m["cx"] for m in markers), min(m["cy"] for m in markers)
+    tpl_per_mm = tpl["pageDimensions"][0] / (max(m["cx"] for m in markers) - x0)
+
+    def to_img(tx, ty):
+        return round((x0 + tx / tpl_per_mm) * px_per_mm), round((y0 + ty / tpl_per_mm) * px_per_mm)
+
+    for b in tpl["fieldBlocks"].values():
+        bw, bh = b.get("bubbleDimensions", tpl["bubbleDimensions"])
+        ox, oy = b["origin"]
+        for li in range(len(expand_labels(b["fieldLabels"]))):
+            for vi in range(len(b["bubbleValues"])):
+                if b["direction"] == "horizontal":
+                    tx, ty = ox + vi * b["bubblesGap"], oy + li * b["labelsGap"]
+                else:
+                    tx, ty = ox + li * b["labelsGap"], oy + vi * b["bubblesGap"]
+                cv2.rectangle(img, to_img(tx, ty), to_img(tx + bw, ty + bh), (40, 170, 40), 2)
+    for m in markers:
+        cv2.circle(img, (round(m["cx"] * px_per_mm), round(m["cy"] * px_per_mm)), 9, (40, 40, 220), 3)
+    return cv2.imencode(".png", img)[1].tobytes()
 
 
 def id_format_text(columns) -> str:
-    """'(F/H/P) 2 0 (0-4) (0-9) ... (H/P/G)' for a list of ID column symbols."""
+    """'(F/H/P) 2 0 (0-4) (0-9) ... (H/P/G)' from each ID column's symbols."""
     def col(c):
         if len(c) == 1:
             return c
-        return "(0-9)" if c == D else ("(0-4)" if c == "01234" else f"({'/'.join(c)})")
+        if c.isdigit() and c == "".join(str(d) for d in range(int(c[0]), int(c[0]) + len(c))):
+            return f"({c[0]}-{c[-1]})"
+        return f"({'/'.join(c)})"
     return " ".join(col(c) for c in columns)
 
 
-def generate(questions=30, options=4, sets=0, id_format="bits", title="Answer Sheet"):
-    """Return a dict with template, config and the image/PDF bytes for a new sheet."""
-    title = (title or "Answer Sheet").strip()
-    validate(questions, options, sets, id_format, title)
-    opts = list(OPTION_LETTERS[:options])
-    set_values = list(SET_LETTERS[:sets])
-    id_symbols = ID_FORMATS[id_format]
-    id_columns, id_labels = [], []     # template "idColumns" and the bubbled labels
-
-    img = Image.new("L", (PAGE_W, PAGE_H), 255)
-    draw = ImageDraw.Draw(img)
-    blocks, boxes = {}, []      # boxes: (cx, cy, size, label) for the preview
-
-    for cx in (MARKER_INSET, PAGE_W - MARKER_INSET):
-        for cy in (MARKER_INSET, PAGE_H - MARKER_INSET):
-            _marker(draw, cx, cy)
-
-    # Header
-    _text(draw, (PAGE_W / 2, Y_TOP + 20), title, 42, bold=True, anchor="mm")
-    _text(draw, (PAGE_W / 2, Y_TOP + 72),
-          "Use a dark pen. Fill the bubble completely. Do not write near the corner squares.",
-          20, fill=90, anchor="mm")
-    y = Y_TOP + 120
-    _text(draw, (X0, y), "Name", 24)
-    draw.line([X0 + 80, y + 28, X0 + 700, y + 28], fill=LINE, width=2)
-    _text(draw, (X0 + 760, y), "Signature", 24)
-    draw.line([X0 + 890, y + 28, X1, y + 28], fill=LINE, width=2)
-    y += 75
-
-    # ID number: a write-in box over each column, bubbles below. A one-symbol
-    # column (the "2" and "0" of the year) is printed in its box, not bubbled.
-    section_h = 0
-    if id_symbols:
-        _text(draw, (X0, y), "ID Number", 24, bold=True)
-        _text(draw, (X0 + 160, y + 4), "e.g. F20231187H", 18, fill=110)
-        box_top = y + 40
-        first_cy = box_top + 44 + 34
-        for i, symbols in enumerate(id_symbols):
-            cx = X0 + ID_PITCH_X / 2 + i * ID_PITCH_X
-            draw.rectangle([cx - 20, box_top, cx + 20, box_top + 44], outline=LINE, width=2)
-            if len(symbols) == 1:
-                _text(draw, (cx, box_top + 22), symbols, 28, bold=True, anchor="mm")
-                id_columns.append(symbols)
-                continue
-            for r, v in enumerate(symbols):
-                cy = first_cy + r * ID_PITCH_Y
-                _bubble(draw, cx, cy, ID_D, v)
-                boxes.append((cx, cy, ID_BOX, v))
-            label = f"id{i + 1}"
-            blocks[f"ID{i + 1}"] = {
-                "bubbleDimensions": [ID_BOX, ID_BOX],
-                "bubbleValues": list(symbols),
-                "direction": "vertical",
-                "fieldLabels": [label],
-                "bubblesGap": ID_PITCH_Y,
-                "labelsGap": 0,
-                "origin": _box(cx, first_cy, ID_BOX),
-            }
-            id_columns.append(label)
-            id_labels.append(label)
-        rows = max(len(c) for c in id_symbols)
-        section_h = first_cy + (rows - 1) * ID_PITCH_Y + ID_D / 2 - y
-
-    # Set: one row of bubbles, to the right of the ID grid
-    if set_values:
-        sx = X0 + (len(id_symbols) * ID_PITCH_X + 90 if id_symbols else 0)
-        _text(draw, (sx, y), "Set", 24, bold=True)
-        cy = y + 40 + SET_D / 2
-        for i, v in enumerate(set_values):
-            cx = sx + SET_D / 2 + i * SET_PITCH
-            _bubble(draw, cx, cy, SET_D, v)
-            boxes.append((cx, cy, SET_BOX, v))
-        blocks["Set"] = {
-            "bubbleDimensions": [SET_BOX, SET_BOX],
-            "bubbleValues": set_values,
-            "direction": "horizontal",
-            "fieldLabels": ["Set"],
-            "bubblesGap": SET_PITCH,
-            "labelsGap": 0,
-            "origin": _box(sx + SET_D / 2, cy, SET_BOX),
-        }
-        section_h = max(section_h, 40 + SET_D)
-
-    if section_h:
-        y += section_h + 30
-
-    # Questions: columns of groups of five
-    _text(draw, (X0, y), "Answers", 24, bold=True)
-    draw.line([X0, y + 36, X1, y + 36], fill=200, width=1)
-    y += 56
-    plan = plan_questions(questions, options, y)
-    rp, d, box, op, col_w = plan["rp"], plan["d"], plan["box"], plan["op"], plan["col_w"]
-    total_w = plan["cols"] * col_w + (plan["cols"] - 1) * COL_GAP
-    x_start = X0 + (X1 - X0 - total_w) / 2
-
-    q = 1
-    for c in range(plan["cols"]):
-        col_x = x_start + c * (col_w + COL_GAP)
-        first_bubble_x = col_x + NUM_W + d / 2
-        for g in range(math.ceil(plan["rows"] / GROUP)):
-            a = q
-            group_y = y + rp / 2 + g * (GROUP * rp + GROUP_GAP)
-            for r in range(GROUP):
-                if q > questions or g * GROUP + r >= plan["rows"]:
-                    break
-                cy = group_y + r * rp
-                _text(draw, (col_x + NUM_W - 14, cy), str(q), max(14, int(d * 0.55)), bold=True, anchor="rm")
-                for i, o in enumerate(opts):
-                    cx = first_bubble_x + i * op
-                    _bubble(draw, cx, cy, d, o)
-                    boxes.append((cx, cy, box, o))
-                q += 1
-            if q > a:
-                blocks[f"Q{a}_{q - 1}"] = {
-                    "bubbleValues": opts,
-                    "direction": "horizontal",
-                    "fieldLabels": [_range_label("q", a, q - 1)],
-                    "bubblesGap": op,
-                    "labelsGap": rp,
-                    "origin": _box(first_bubble_x, group_y, box),
-                }
-
-    _text(draw, (PAGE_W / 2, PAGE_H - 40),
-          f"{questions} questions · options {opts[0]}–{opts[-1]}"
-          + (f" · sets {', '.join(set_values)}" if set_values else "")
-          + (" · BITS ID number" if id_symbols else ""),
-          16, fill=FAINT, anchor="mm")
-
-    # Marker image: the printed marker with a white margin, MARKER_CROP px square
-    marker = Image.new("L", (MARKER_CROP, MARKER_CROP), 255)
-    _marker(ImageDraw.Draw(marker), MARKER_CROP / 2, MARKER_CROP / 2)
-
-    template = {
-        "pageDimensions": list(FRAME),
-        "bubbleDimensions": [box, box],
-        "preProcessors": [{
-            "name": "CropOnMarkers",
-            "options": {
-                "relativePath": "omr_marker.png",
-                "sheetToMarkerWidthRatio": MARKER_RATIO,
-                "marker_rescale_range": [80, 120],
-                "marker_rescale_steps": 8,
-            },
-        }],
-        # idColumns is read by omr_to_csv.py (which removes it before the engine sees it)
-        # to put the fixed characters back into "ID NO"
-        **({"idColumns": id_columns, "customLabels": {"ID NO": id_labels}} if id_symbols else {}),
-        "fieldBlocks": blocks,
-        "outputColumns": (["Set"] if set_values else []) + (["ID NO"] if id_symbols else [])
-        + [f"q{i}" for i in range(1, questions + 1)],
-    }
-
-    config = {
-        "dimensions": {
-            "display_height": 2480, "display_width": 1640,
-            "processing_height": PAGE_H, "processing_width": PAGE_W,
-        },
-        "threshold_params": {
-            "MIN_GAP": 30, "MIN_JUMP": 25, "CONFIDENT_SURPLUS": 5,
-            "JUMP_DELTA": 30, "PAGE_TYPE_FOR_THRESHOLD": "white",
-        },
-        "alignment_params": {"auto_align": False},
-        "outputs": {"show_image_level": 0, "save_image_level": 2, "save_detections": True,
-                    "filter_out_multimarked_files": False},
-    }
-
-    preview = img.convert("RGB")
-    pdraw = ImageDraw.Draw(preview)
-    for cx, cy, b, _ in boxes:
-        pdraw.rectangle([cx - b / 2, cy - b / 2, cx + b / 2, cy + b / 2], outline=(40, 170, 40), width=2)
-    for cx in (MARKER_INSET, PAGE_W - MARKER_INSET):
-        for cy in (MARKER_INSET, PAGE_H - MARKER_INSET):
-            pdraw.ellipse([cx - 8, cy - 8, cx + 8, cy + 8], outline=(220, 40, 40), width=3)
-
-    def to_bytes(image, fmt, **kw):
-        buf = io.BytesIO()
-        image.save(buf, fmt, **kw)
-        return buf.getvalue()
-
+def generate(settings: dict) -> dict:
+    """Settings -> template, PDF, PNG, marker and preview. Raises DesignError if the sheet has issues."""
+    out = run_sheet_js(settings)
+    if out["issues"]:
+        raise DesignError(" ".join(out["issues"]))
+    pdf = svg_to_pdf(out["svg"])
+    png = pdf_to_png(pdf)
+    with tempfile.TemporaryDirectory() as d:
+        write_marker(Path(d) / "omr_marker.png")
+        marker = (Path(d) / "omr_marker.png").read_bytes()
     return {
-        "template": template,
-        "config": config,
-        "sheet_png": to_bytes(img, "PNG"),
-        "sheet_pdf": to_bytes(img, "PDF", resolution=DPI),
-        "marker_png": to_bytes(marker, "PNG"),
-        "preview_png": to_bytes(preview, "PNG"),
-        "params": {"questions": questions, "options": options, "sets": sets,
-                   "id_format": id_format, "title": title},
-        "layout": {"columns": plan["cols"], "rows": plan["rows"], "bubble": d},
+        "settings": out["settings"],
+        "template": out["template"],
+        "sheet_pdf": pdf,
+        "sheet_png": png,
+        "marker_png": marker,
+        "preview_png": preview_png(png, out),
+        "fit": out["fit"],
     }
 
 
 def write_bundle(bundle: dict, folder: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "template.json").write_text(json.dumps(bundle["template"], indent=2))
-    (folder / "config.json").write_text(json.dumps(bundle["config"], indent=2))
+    (folder / "draft.json").write_text(json.dumps(bundle["settings"], indent=2))
     for key, name in (("sheet_pdf", "sheet.pdf"), ("sheet_png", "sheet.png"),
                       ("marker_png", "omr_marker.png"), ("preview_png", "preview.png")):
         (folder / name).write_bytes(bundle[key])
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a printable OMR sheet and its template.")
-    parser.add_argument("--questions", type=int, default=30)
-    parser.add_argument("--options", type=int, default=4, help="Options per question (2-8)")
-    parser.add_argument("--sets", type=int, default=0, help="Number of question-paper sets (0 = none)")
-    parser.add_argument("--id-format", choices=list(ID_FORMATS), default="bits",
-                        help="bits: (F/H/P) 2 0 (0-4) (0-9) (0-9)x4 (H/P/G); none: no ID grid")
-    parser.add_argument("--title", default="Answer Sheet")
+    parser = argparse.ArgumentParser(description="Make a printable OMR sheet and its template with designer/sheet.js.")
     parser.add_argument("--out", required=True, help="Output folder")
+    parser.add_argument("--draft", help="Draft saved from designer/index.html")
+    parser.add_argument("--questions", type=int)
+    parser.add_argument("--options", help="Option letters, e.g. ABCDE")
+    parser.add_argument("--sets", help="Set letters, e.g. ABCD")
+    parser.add_argument("--no-set", action="store_true", help="Leave out the set box")
+    for k in ("title", "exam", "course", "date"):
+        parser.add_argument(f"--{k}")
     args = parser.parse_args()
+    settings = json.loads(Path(args.draft).read_text()) if args.draft else {}
+    for k in ("questions", "options", "sets", "title", "exam", "course", "date"):
+        if getattr(args, k) is not None:
+            settings[k] = getattr(args, k)
+    if args.no_set:
+        settings["showSet"] = False
     try:
-        bundle = generate(args.questions, args.options, args.sets, args.id_format, args.title)
+        bundle = generate(settings)
     except DesignError as e:
         parser.error(str(e))
     write_bundle(bundle, Path(args.out))
-    lay = bundle["layout"]
-    print(f"Sheet written to {args.out}: {lay['columns']} column(s) x {lay['rows']} row(s), "
-          f"bubble {lay['bubble']} px")
+    print(f"Sheet written to {args.out}: {bundle['fit']['cols']} column(s), "
+          f"up to {bundle['fit']['capacity']} questions fit")
 
 
 if __name__ == "__main__":

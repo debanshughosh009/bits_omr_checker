@@ -168,3 +168,12 @@ details.help { margin: 0 0 1rem; color: var(--muted); }
 details.help summary { cursor: pointer; color: var(--accent); }
 details.help ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
 details.help li { margin-bottom: 0.3rem; }
+
+/* Designer form (mirrors designer/index.html) */
+fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.9rem 0.9rem; margin: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+legend { font-weight: 600; padding: 0 0.3rem; color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+textarea { font: inherit; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 7px; resize: vertical; }
+.issues { margin: 0 0 0.8rem; padding: 0.6rem 0.9rem 0.6rem 1.8rem; background: var(--warn-soft); color: var(--warn); border-radius: 8px; }
+.issues:empty { display: none; }
+.sheet-holder svg { display: block; width: 100%; height: auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+.small-btn { padding: 0.25rem 0.7rem; font-size: 0.85rem; }

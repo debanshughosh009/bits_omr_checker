@@ -1,8 +1,8 @@
 """
 OMR Checker web app.
 
-Designer:  generates a printable sheet + template from the number of
-           questions, options and sets (BITS ID grid optional), or uploads an existing
+Designer:  makes a printable sheet + template with designer/sheet.js (the same
+           sheet designer/index.html prints), or uploads an existing
            layout (template.json, optional config.json, blank sheet).
 Professor: creates an exam on a layout, enters the answer key on a clickable
            grid, uploads scans (single, batch or ZIP) and downloads
@@ -63,13 +63,25 @@ def index():
 # Designer
 # ---------------------------------------------------------------------------
 
+def render_designer(form=None, name=""):
+    try:
+        form = form or pl.design_defaults()
+        error = None
+    except PipelineError as e:
+        form, error = {}, str(e)
+    return render_template("designer.html", layouts=pl.list_layouts(), form=form, name=name,
+                           designer_error=error)
+
+
 @app.route("/designer")
 def designer():
-    defaults = {"questions": 30, "options": 4, "sets": 0, "id_format": "bits", "title": "", "name": ""}
-    form = {k: request.args.get(k, v) for k, v in defaults.items()}
-    return render_template("designer.html", layouts=pl.list_layouts(), form=form,
-                           limits=pl.sheet_designer.LIMITS,
-                           bits_id=pl.sheet_designer.id_format_text(pl.sheet_designer.ID_COLUMNS))
+    return render_designer()
+
+
+@app.route("/designer/sheet.js")
+def designer_sheet_js():
+    """designer/sheet.js, so the live preview is drawn by the same code as designer/index.html."""
+    return send_from_directory(pl.REPO_ROOT / "designer", "sheet.js", mimetype="text/javascript", max_age=0)
 
 
 @app.post("/designer/layouts")
@@ -96,23 +108,15 @@ def create_layout():
 
 @app.post("/designer/generate")
 def generate_layout():
+    settings = {}
     try:
-        params = pl.design_params(request.form)
-        layout_id = pl.create_generated_layout(request.form.get("name", ""), params)
+        settings = pl.design_settings(request.form)
+        layout_id = pl.create_generated_layout(request.form.get("name", ""), settings)
     except PipelineError as e:
         flash(str(e), "error")
-        return redirect(url_for("designer", **request.form))
-    flash("Sheet generated. Download the PDF and print it; scans of it can be read straight away.", "ok")
+        return render_designer(settings or None, request.form.get("name", ""))
+    flash("Sheet created. Download the PDF and print it at 100%; scans of it can be read straight away.", "ok")
     return redirect(url_for("layout_detail", layout_id=layout_id))
-
-
-@app.route("/designer/design-preview")
-def design_preview():
-    try:
-        png = pl.design_preview(pl.design_params(request.args))
-    except PipelineError as e:
-        return jsonify(error=str(e)), 400
-    return app.response_class(png, mimetype="image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.route("/designer/layouts/<layout_id>")

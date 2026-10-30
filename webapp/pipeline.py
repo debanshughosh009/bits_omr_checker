@@ -370,7 +370,7 @@ def get_layout(layout_id: str) -> dict | None:
 
 def layout_files(layout: dict) -> list[str]:
     """Files a designer can download (and that go into the layout ZIP)."""
-    names = ["template.json", "config.json", layout.get("sheet"), "sheet.png", *layout["assets"]]
+    names = ["template.json", "config.json", layout.get("sheet"), "sheet.png", "draft.json", *layout["assets"]]
     seen, out = set(), []
     for n in names:
         if n and n not in seen and (layout["dir"] / n).exists():
@@ -448,36 +448,31 @@ def create_layout(name, template_bytes, config_bytes=None, sheet_name=None, shee
     return layout_id, warning
 
 
-def design_params(form: dict) -> dict:
-    """Read sheet designer settings from a form / query string."""
-    def num(key, default):
-        try:
-            return int(form.get(key, default))
-        except (TypeError, ValueError):
-            raise PipelineError(f"{key.replace('_', ' ').capitalize()} must be a whole number")
-    return {
-        "questions": num("questions", 30),
-        "options": num("options", 4),
-        "sets": num("sets", 0),
-        "id_format": str(form.get("id_format", "bits")),
-        "title": str(form.get("title", "") or "Answer Sheet").strip(),
-    }
-
-
-def design_preview(params: dict) -> bytes:
+def design_settings(form: dict) -> dict:
+    """The designer/index.html settings from a submitted form (unchecked boxes are absent)."""
     try:
-        return sheet_designer.generate(**params)["preview_png"]
+        settings = sheet_designer.clean_settings({k: form.get(k) for k in form})
+    except sheet_designer.DesignError as e:
+        raise PipelineError(str(e))
+    settings["showSet"] = bool(form.get("showSet"))
+    return settings
+
+
+def design_defaults() -> dict:
+    try:
+        return sheet_designer.defaults()
     except sheet_designer.DesignError as e:
         raise PipelineError(str(e))
 
 
-def create_generated_layout(name: str, params: dict) -> str:
-    """Generate a printable sheet + template from numbers and save it as a layout."""
-    name = name.strip() or params["title"]
+def create_generated_layout(name: str, settings: dict) -> str:
+    """Make a sheet with designer/sheet.js and save it as a layout."""
     try:
-        bundle = sheet_designer.generate(**params)
+        bundle = sheet_designer.generate(settings)
     except sheet_designer.DesignError as e:
         raise PipelineError(str(e))
+    s = bundle["settings"]
+    name = name.strip() or " ".join(x for x in (s.get("course"), s.get("exam")) if x) or s.get("title") or "Sheet"
     LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
     layout_id = new_id(name, LAYOUTS_DIR)
     folder = LAYOUTS_DIR / layout_id
@@ -485,7 +480,7 @@ def create_generated_layout(name: str, params: dict) -> str:
         sheet_designer.write_bundle(bundle, folder)
         write_json(folder / "layout.json", {
             "name": name, "created": now(), "sheet": "sheet.pdf",
-            "generated": {**bundle["params"], **bundle["layout"]},
+            "generated": {"settings": s, "columns": bundle["fit"]["cols"], "capacity": bundle["fit"]["capacity"]},
         })
     except Exception as e:
         shutil.rmtree(folder, ignore_errors=True)

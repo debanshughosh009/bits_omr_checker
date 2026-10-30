@@ -14,7 +14,9 @@
       <dt>Sets</dt><dd>{{ layout.info.sets|join(', ') or 'none (one key for all sheets)' }}</dd>
       <dt>ID number</dt><dd>{% if layout.info.id_format %}<span class="mono">{{ layout.info.id_format }}</span>{% elif layout.info.id_length %}{{ layout.info.id_length }} characters{% else %}not on this sheet{% endif %}</dd>
       {% if layout.generated %}
-      <dt>Sheet</dt><dd>A4, {{ layout.generated.columns }} column(s) × {{ layout.generated.rows }} row(s), corner markers</dd>
+      <dt>Sheet</dt><dd>A4 from <code>designer/sheet.js</code>, {{ layout.generated.columns }} question column(s), corner markers</dd>
+      {% set g = layout.generated.settings or {} %}
+      {% if g.title or g.exam or g.course %}<dt>Header</dt><dd>{{ [g.title, g.course, g.exam, g.date]|select|join(' · ') }}</dd>{% endif %}
       {% else %}
       <dt>Page size</dt><dd>{{ layout.info.page|join(' × ') }} px</dd>
       {% endif %}

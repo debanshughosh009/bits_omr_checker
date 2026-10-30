@@ -1,4 +1,4 @@
-# OMR Checker web app: designer uploads layouts, professor scores scans.
+# OMR Checker web app: designer makes or uploads layouts, professor scores scans.
 # Build and run:  docker compose up -d --build   ->  http://localhost:8000
 FROM python:3.12-slim
 
@@ -10,6 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Node runs designer/sheet.js, which lays out designed sheets and their templates
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 # Headless OpenCV: same cv2 module as opencv-contrib-python, without GUI libraries
 COPY scans_to_csv/requirements.txt scans_to_csv/requirements.txt
 COPY webapp/requirements.txt webapp/requirements.txt
@@ -19,6 +24,7 @@ RUN pip install --no-cache-dir \
         opencv-contrib-python-headless
 
 COPY scans_to_csv scans_to_csv
+COPY designer designer
 COPY scoring scoring
 COPY webapp webapp
 

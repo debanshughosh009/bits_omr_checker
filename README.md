@@ -31,7 +31,7 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
    - Per-set keys, configurable marking, bonus questions, "any one of" and "all of" (multiple-correct) answers with optional partial credit, class roster merge.
 3. **Web App ([`webapp/`](webapp/)):**
    - Browser UI, packaged as a Docker container, that runs the whole pipeline.
-   - **Designer:** generates a printable sheet and its template from the number of questions, options and sets (with the BITS ID grid), or uploads a custom template. [`designer/index.html`](designer/) is a standalone version that needs no server.
+   - **Designer:** makes a printable sheet and its template with the same sheet designer as [`designer/index.html`](designer/) (both run `designer/sheet.js`), or uploads a custom template.
    - **Professor:** enters the answer key on a clickable grid, uploads scans, fixes flagged sheets, downloads `results.csv` and `scores.csv`.
 4. **Template Utilities ([`scripts/`](scripts/)):**
    - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
@@ -55,7 +55,7 @@ Open **http://localhost:8000**. Everything (layouts, exams, scans, CSVs) is stor
 | `docker compose down` | Stop; data is kept |
 | `docker compose down -v` | Stop and **delete all data** |
 
-Without Docker:
+Without Docker (needs Python and Node.js):
 
 ```bash
 pip install -r scans_to_csv/requirements.txt -r webapp/requirements.txt opencv-contrib-python
@@ -68,20 +68,20 @@ python webapp/app.py            # http://localhost:8000, data in ./data (git-ign
 
 ### 1. Designer: create a sheet layout
 
-**Design a new sheet** (recommended). Choose:
+**Design a new sheet** (recommended). The form is the one in [`designer/index.html`](designer/), and the sheet comes from the same code (`designer/sheet.js`). A sheet made here is the sheet `designer/index.html` prints.
 
-| Setting | Range | Notes |
-|---|---|---|
-| Questions | 1–300 | Bubbles shrink automatically to fit one A4 page; the form tells you the maximum if it doesn't fit |
-| Options per question | 2–8 | A–B up to A–H |
-| Question-paper sets | none, 2–8 | Adds a Set bubble row; each set gets its own answer key |
-| ID number | BITS ID or none | `(F/H/P) 2 0 (0-4) (0-9) (0-9)(0-9)(0-9)(0-9) (H/P/G)`, e.g. `F20231187H`: a write-in box over each column, the "2 0" printed, the rest bubbled. Same format as `designer/` |
-| Title | text | Printed at the top of the sheet |
+| Setting | Notes |
+|---|---|
+| Title, exam, course, date | Printed in the header |
+| Instructions | One per line, printed small beside the ID grid |
+| Set box, sets | Optional set bubbles, one letter each; each set gets its own answer key |
+| ID heading | The ID grid itself is fixed: `(F/H/P) 2 0 (0-4) (0-9) (0-9)(0-9)(0-9)(0-9) (H/P/G)`, e.g. `F20231187H`, with a write-in box over each column and the "2 0" printed |
+| Options, number of questions | Option letters (e.g. `ABCDE`) and 1–300 questions; the form shows how many fit and lists anything that doesn't |
 
-The preview updates as you type. **Create layout** saves:
+The preview (A4, exactly as printed) updates as you type, and **Open draft** loads a draft saved from `designer/index.html`. **Create layout** saves:
 - `sheet.pdf`: print this at 100% ("actual size") on A4.
 - `sheet.png`
-- `template.json`, `config.json` and `omr_marker.png`
+- `template.json`, `omr_marker.png` and `draft.json` (the settings, which can be opened again in `designer/index.html`)
 
 All of these can be downloaded on the layout page, one at a time or as a ZIP.
 
@@ -202,10 +202,11 @@ python scans_to_csv/omr_to_csv.py --help
 ### Sheet Designer (command line)
 
 ```bash
-python webapp/sheet_designer.py --questions 40 --options 5 --sets 2 --title "EEE Quiz 2" --out my_sheet/   # --id-format none to drop the ID grid
+python webapp/sheet_designer.py --out my_sheet/ --course "EEE F111" --exam "Quiz 2" --options ABCDE --questions 40
+python webapp/sheet_designer.py --out my_sheet/ --draft draft_saved_from_designer.json
 ```
 
-Writes `sheet.pdf`, `sheet.png`, `template.json`, `config.json`, `omr_marker.png` and `preview.png`.
+It runs `designer/sheet.js` with Node.js and writes `sheet.pdf`, `sheet.png`, `template.json`, `omr_marker.png`, `preview.png` and `draft.json`.
 
 ### Stage 2: Scoring
 
@@ -323,7 +324,7 @@ omr_checker/
 ├── webapp/                 # Web app: designer & professor UI, runs Stage 1 + 2
 │   ├── app.py              # Flask routes
 │   ├── pipeline.py         # Storage, layouts, exams, background processing
-│   ├── sheet_designer.py   # Generates printable sheet + template from numbers
+│   ├── sheet_designer.py   # Runs designer/sheet.js; draws its SVG as PDF/PNG
 │   ├── run_stage1.py       # Runs Stage 1 without a display (containers)
 │   ├── templates/, static/ # Pages, styles, answer key editor
 │   └── README.md

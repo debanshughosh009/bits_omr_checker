@@ -5,47 +5,55 @@
 
 <div class="grid-2 wide-right">
   <section class="card">
-    <h2>Design a new sheet</h2>
-    <p class="muted small">Pick the numbers and get a printable sheet with its template. Scans of the printed sheet can be read straight away.</p>
-    <form method="post" action="{{ url_for('generate_layout') }}" class="form" id="design-form"
-          data-preview-url="{{ url_for('design_preview') }}">
-      <label>Title printed on the sheet <input name="title" value="{{ form.title }}" placeholder="Answer Sheet" maxlength="80"></label>
-      <div class="inline-fields">
-        <label>Questions
-          <input type="number" name="questions" min="{{ limits.questions[0] }}" max="{{ limits.questions[1] }}" value="{{ form.questions }}" required></label>
-        <label>Options per question
-          <select name="options">
-            {% for n in range(limits.options[0], limits.options[1] + 1) %}
-              <option value="{{ n }}" {{ 'selected' if form.options|int == n }}>{{ n }} (A–{{ 'ABCDEFGH'[n - 1] }})</option>
-            {% endfor %}
-          </select></label>
-      </div>
-      <div class="inline-fields">
-        <label>Question-paper sets
-          <select name="sets">
-            <option value="0" {{ 'selected' if form.sets|int == 0 }}>none</option>
-            {% for n in range(2, limits.sets[1] + 1) %}
-              <option value="{{ n }}" {{ 'selected' if form.sets|int == n }}>{{ n }} (A–{{ 'ABCDEFGH'[n - 1] }})</option>
-            {% endfor %}
-          </select></label>
-        <label>ID number
-          <select name="id_format">
-            <option value="bits" {{ 'selected' if form.id_format == 'bits' }}>BITS ID: {{ bits_id }}</option>
-            <option value="none" {{ 'selected' if form.id_format == 'none' }}>no ID grid</option>
-          </select></label>
-      </div>
-      <label>Layout name <span class="muted">shown to professors; defaults to the title</span>
-        <input name="name" value="{{ form.name }}" placeholder="e.g. EEE quiz 40Q 5 options"></label>
-      <p id="design-error" class="flash error hidden"></p>
-      <button class="btn primary">Create layout</button>
+    <div class="title-row">
+      <h2>Design a new sheet</h2>
+      <label class="btn small-btn">Open draft<input type="file" id="open-draft" accept=".json,application/json" hidden></label>
+    </div>
+    <p class="muted small">The same sheet designer as <code>designer/index.html</code>: the preview and the PDF are drawn by <code>designer/sheet.js</code>. Drafts saved there open here.</p>
+    {% if designer_error %}
+      <div class="flash error">{{ designer_error }}</div>
+    {% else %}
+    <ul id="design-issues" class="issues"></ul>
+    <form method="post" action="{{ url_for('generate_layout') }}" class="form" id="design-form" autocomplete="off">
+      <fieldset>
+        <legend>Header</legend>
+        <label>Title <input name="title" value="{{ form.title }}"></label>
+        <div class="inline-fields">
+          <label>Exam <input name="exam" value="{{ form.exam }}"></label>
+          <label>Course <input name="course" value="{{ form.course }}" placeholder="EEE F111 Electrical Sciences"></label>
+          <label>Date <input name="date" value="{{ form.date }}" placeholder="12 Sep 2026"></label>
+        </div>
+        <label>Instructions <span class="muted">one per line, printed small beside the ID grid</span>
+          <textarea name="instructions" rows="2">{{ form.instructions }}</textarea></label>
+      </fieldset>
+      <fieldset>
+        <legend>Set</legend>
+        <label class="inline"><input type="checkbox" name="showSet" value="1" {{ 'checked' if form.showSet }}> Print a set box</label>
+        <label>Sets <span class="muted">one letter each</span> <input name="sets" value="{{ form.sets }}"></label>
+      </fieldset>
+      <fieldset>
+        <legend>ID number</legend>
+        <label>Heading <input name="idTitle" value="{{ form.idTitle }}"></label>
+        <p class="muted small">Fixed format <code>(F/H/P) 2 0 (0-4) (0-9) (0-9)(0-9)(0-9)(0-9) (H/P/G)</code>, as in F20231187H. The "20" is printed; each column has a box above it to write the character in.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Questions</legend>
+        <div class="inline-fields">
+          <label>Options <span class="muted">one letter each</span> <input name="options" value="{{ form.options }}"></label>
+          <label>Number of questions <input name="questions" type="number" min="1" max="300" value="{{ form.questions }}"></label>
+        </div>
+        <p class="muted small" id="design-fit"></p>
+      </fieldset>
+      <label>Layout name <span class="muted">shown to professors; defaults to course and exam</span>
+        <input name="name" value="{{ name }}" placeholder="e.g. EEE F111 Quiz 1"></label>
+      <button class="btn primary" id="design-submit">Create layout</button>
     </form>
-    <p class="muted small">Up to {{ limits.questions[1] }} questions on one A4 page. Bubbles shrink automatically when there are many questions. The ID grid has a write-in box over each column; the "2 0" of the year is printed, the rest is bubbled (e.g. <code>F20231187H</code>), the same format as <code>designer/index.html</code>.</p>
+    {% endif %}
   </section>
 
   <section class="card">
-    <h2>Preview</h2>
-    <p class="muted small">Green boxes show where the reader looks; red circles are the corner markers used to straighten scans.</p>
-    <div class="preview-wrap"><img id="design-preview" class="preview" alt="Sheet preview"></div>
+    <h2>Preview <span class="muted small">A4, exactly as printed</span></h2>
+    <div class="preview-wrap"><div id="design-sheet" class="sheet-holder"></div></div>
   </section>
 </div>
 
@@ -90,4 +98,7 @@
   </section>
 </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='designer.js') }}"></script>{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('designer_sheet_js') }}"></script>
+<script src="{{ url_for('static', filename='designer.js') }}"></script>
+{% endblock %}
