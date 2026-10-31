@@ -25,7 +25,10 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
    - Self-contained pipeline: includes its own detection engine (`src/`), `template.json`, and `config.json`.
    - Detects corner alignment markers, corrects skew, samples bubble fills, decodes alphanumeric IDs and sets, and writes clean CSV data.
    - Performs built-in anomaly detection (`MULTI` options, incomplete `ID_LEN`, missing `NO_SET`).
-2. **Template Utilities ([`scripts/`](file:///c:/Acads/omr_checker/scripts/)):**
+2. **Scoring ([`scoring/`](file:///c:/Acads/omr_checker/scoring/)):**
+   - **Stage 2 Engine & UI:** Reads `output/results.csv` and answer keys, applies marking schemes and multi-mark policies, and exports `output/score.csv`.
+   - Built with Python standard library only; works fully offline with an integrated local web UI and headless CLI.
+3. **Template Utilities ([`scripts/`](file:///c:/Acads/omr_checker/scripts/)):**
    - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
 3. **Architecture & Documentation ([`docs/`](file:///c:/Acads/omr_checker/docs/)):**
    - Multi-milestone architecture plan (`plan.md`) for future scoring, roster validation, and OMR designer phases.
@@ -38,6 +41,15 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 omr_checker/
 ├── input/                  # Scan drop folder (JPG, PNG, PDF) [tracked via .gitkeep]
 ├── output/                 # Results directory (results.csv, overlays) [tracked via .gitkeep]
+├── scoring/                # Stage 2: results.csv + keys -> score.csv
+│   ├── scorer.py           # Pure scoring functions
+│   ├── io_utils.py         # File I/O, validation, atomic write
+│   ├── cli.py              # Headless CLI
+│   ├── app.py              # Offline web UI server (127.0.0.1)
+│   ├── static/index.html   # Web UI single-page interface
+│   ├── keys/               # Answer-key JSON store (.gitkeep)
+│   ├── tests/              # Test suite
+│   └── README.md           # Stage 2 documentation
 ├── scans_to_csv/           # Stage 1: Standalone scan-to-CSV CLI pipeline
 │   ├── omr_to_csv.py       # Main CLI script
 │   ├── template.json       # Sheet layout definition
@@ -131,6 +143,46 @@ The template is computed from the same layout that draws the sheet, so there is 
 `python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed.
 
 ---
+
+### 4. Scoring (Stage 2)
+
+The scoring stage reads `output/results.csv` plus answer keys and writes `output/score.csv` alongside a run sidecar `output/score_run.json`.
+
+#### Local Web UI (Offline)
+Launch the local browser interface on `127.0.0.1:8765`:
+```bash
+python scoring/app.py
+```
+- Fully offline: standard library only, rejects non-localhost connections.
+- Step 1: Summary of `results.csv` (row count, sets found, question count, anomalies).
+- Step 2: Marking scheme (+4/-1/0, +1/0/0, +3/-1/0, +2/-0.5/0, custom) and multi-mark policy selection.
+- Step 3: Interactive key grid and text paste (`BC-DA...`, where `-` or space denotes uncounted questions).
+- Step 4: Save/load keys, preview first 20 rows with summary stats (mean, min, max, flagged count), and atomic write to `output/score.csv`.
+
+#### Headless CLI
+```bash
+python scoring/cli.py \
+  --results output/results.csv \
+  --keys scoring/keys/quiz1.json \
+  --out output/score.csv \
+  --scheme 4,-1,0 \
+  --multi zero \
+  --per-question
+```
+
+#### Blank Key Rule
+A blank key entry (`""`) means that question is **NOT counted** for that set. It contributes 0 marks to all students and is excluded from `max_score`. A student's answer on it is completely ignored.
+
+#### Multi-Mark Policies
+When a student bubbles two or more options on a question:
+- `zero` (default): Treated as unattempted (`marks_unattempted`).
+- `wrong`: Treated as wrong (`marks_wrong`).
+- `credit_if_contains`: Marked correct if the key letter is inside the marked options; otherwise wrong.
+- `hold`: Question receives 0 marks and sheet is flagged `REVIEW` for human inspection; question is still counted in `max_score`.
+
+#### Output Files
+- `output/score.csv`: Columns `file_id`, `Set`, `ID NO`, `score`, `max_score`, `correct`, `wrong`, `unattempted`, `multi`, `counted`, `score_status`, `check` (plus optional `q1_mark`..`qN_mark`). Written atomically with automatic backups of prior runs (`score_<timestamp>.csv.bak`).
+- `output/score_run.json`: Sidecar recording timestamp, key file path, SHA-256 hash of the key file, scheme, policy, and row counts.
 
 ## Output Format & Quality Checks
 

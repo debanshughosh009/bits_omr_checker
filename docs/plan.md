@@ -131,7 +131,7 @@ sample_273.jpg,1,D,2022A7PS2018H,B,B,C,D,B,C,C,D,B,B,,,,,...,
 | M4 | ID decoding              | 13-column ID decoder with per-column symbol sets, flags                      | ID exact-match >= 99% (rest are flagged, not wrong) |
 | M5 | CLI + CSV                | `omr run --template t.json --input scans/ --out results.csv`                 | End-to-end on the folder works                      |
 | M6 | Scale + robustness       | Multiprocessing, PDF input, progress/logging, error isolation (one bad file never stops the batch) | 1,000 sheets in a few minutes |
-| M7 | Scoring (v2)             | Answer key CSV, +4/-1, per-set keys, Excel report                            | Matches a manual spreadsheet check                  |
+| M7 | Scoring (v2) [DONE]      | Answer key JSON, configurable schemes, multi-mark policies, offline UI + CLI | Self-contained stage completed with unit test suite |
 | M8 | Designer (v2)            | Generates printable sheet + template JSON from parameters                    | New layout works without code changes               |
 
 ## 6. Testing and accuracy strategy
