@@ -2,8 +2,8 @@
   "dimensions": {
     "display_height": 2480,
     "display_width": 1640,
-    "processing_height": 2576,
-    "processing_width": 1791
+    "processing_height": 2340,
+    "processing_width": 1654
   },
   "threshold_params": {
     "MIN_GAP": 30,
@@ -12,7 +12,9 @@
     "JUMP_DELTA": 30,
     "PAGE_TYPE_FOR_THRESHOLD": "white"
   },
-  "alignment_params": { "auto_align": false },
+  "alignment_params": {
+    "auto_align": false
+  },
   "outputs": {
     "show_image_level": 0,
     "save_image_level": 2,

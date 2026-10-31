@@ -1,23 +1,43 @@
 {
   "pageDimensions": [
-    1791,
-    2576
+    1501,
+    2101
   ],
   "bubbleDimensions": [
-    38,
-    38
+    41,
+    37
   ],
-  "preProcessors": [],
+  "preProcessors": [
+    {
+      "name": "CropOnMarkers",
+      "options": {
+        "relativePath": "omr_marker.png",
+        "sheetToMarkerWidthRatio": 83,
+        "marker_rescale_range": [
+          70,
+          130
+        ],
+        "marker_rescale_steps": 12
+      }
+    }
+  ],
+  "idColumns": [
+    "id1",
+    "id2",
+    "id3",
+    "id4",
+    "id9",
+    "id10",
+    "id11",
+    "id12",
+    "id13"
+  ],
   "customLabels": {
     "ID NO": [
       "id1",
       "id2",
       "id3",
       "id4",
-      "id5",
-      "id6",
-      "id7",
-      "id8",
       "id9",
       "id10",
       "id11",
@@ -37,11 +57,11 @@
       "fieldLabels": [
         "Set"
       ],
-      "bubblesGap": 62.4,
+      "bubblesGap": 57.7,
       "labelsGap": 0,
       "origin": [
-        1417,
-        479
+        1248,
+        336
       ]
     },
     "ID1": {
@@ -52,11 +72,11 @@
       "fieldLabels": [
         "id1"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        853,
-        703
+        730,
+        544
       ]
     },
     "ID2": {
@@ -67,11 +87,11 @@
       "fieldLabels": [
         "id2"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        915,
-        703
+        787,
+        544
       ]
     },
     "ID3": {
@@ -83,11 +103,11 @@
       "fieldLabels": [
         "id3"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        978,
-        703
+        845,
+        544
       ]
     },
     "ID4": {
@@ -107,102 +127,11 @@
       "fieldLabels": [
         "id4"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1040,
-        703
-      ]
-    },
-    "ID5": {
-      "bubbleValues": [
-        "A",
-        "B",
-        "H",
-        "P"
-      ],
-      "direction": "vertical",
-      "fieldLabels": [
-        "id5"
-      ],
-      "bubblesGap": 56.0,
-      "labelsGap": 0,
-      "origin": [
-        1103,
-        703
-      ]
-    },
-    "ID6": {
-      "bubbleValues": [
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "7",
-        "8",
-        "A",
-        "H"
-      ],
-      "direction": "vertical",
-      "fieldLabels": [
-        "id6"
-      ],
-      "bubblesGap": 56.0,
-      "labelsGap": 0,
-      "origin": [
-        1165,
-        703
-      ]
-    },
-    "ID7": {
-      "bubbleValues": [
-        "P",
-        "T",
-        "A",
-        "B",
-        "X",
-        "0",
-        "1",
-        "2",
-        "4"
-      ],
-      "direction": "vertical",
-      "fieldLabels": [
-        "id7"
-      ],
-      "bubblesGap": 56.0,
-      "labelsGap": 0,
-      "origin": [
-        1227,
-        703
-      ]
-    },
-    "ID8": {
-      "bubbleValues": [
-        "A",
-        "F",
-        "P",
-        "S",
-        "0",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "7",
-        "8",
-        "9"
-      ],
-      "direction": "vertical",
-      "fieldLabels": [
-        "id8"
-      ],
-      "bubblesGap": 56.0,
-      "labelsGap": 0,
-      "origin": [
-        1290,
-        703
+        903,
+        544
       ]
     },
     "ID9": {
@@ -222,11 +151,11 @@
       "fieldLabels": [
         "id9"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1352,
-        703
+        1190,
+        544
       ]
     },
     "ID10": {
@@ -246,11 +175,11 @@
       "fieldLabels": [
         "id10"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1415,
-        703
+        1248,
+        544
       ]
     },
     "ID11": {
@@ -270,11 +199,11 @@
       "fieldLabels": [
         "id11"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1477,
-        703
+        1306,
+        544
       ]
     },
     "ID12": {
@@ -294,11 +223,11 @@
       "fieldLabels": [
         "id12"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1539,
-        703
+        1364,
+        544
       ]
     },
     "ID13": {
@@ -309,11 +238,11 @@
       "fieldLabels": [
         "id13"
       ],
-      "bubblesGap": 56.0,
+      "bubblesGap": 51.2,
       "labelsGap": 0,
       "origin": [
-        1602,
-        703
+        1421,
+        544
       ]
     },
     "Q1_15": {
@@ -321,11 +250,11 @@
       "fieldLabels": [
         "q1..15"
       ],
-      "bubblesGap": 62.4,
-      "labelsGap": 56.14,
+      "bubblesGap": 57.7,
+      "labelsGap": 51.43,
       "origin": [
-        244,
-        1487
+        172,
+        1260
       ]
     },
     "Q16_30": {
@@ -333,11 +262,11 @@
       "fieldLabels": [
         "q16..30"
       ],
-      "bubblesGap": 62.4,
-      "labelsGap": 56.14,
+      "bubblesGap": 57.7,
+      "labelsGap": 51.43,
       "origin": [
-        1330,
-        1487
+        1164,
+        1260
       ]
     }
   },
