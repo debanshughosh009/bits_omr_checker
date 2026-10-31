@@ -20,17 +20,17 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 ```
 
 ### Key Architectural Stages
-1. **Scans to CSV ([`scans_to_csv/`](file:///c:/Acads/omr_checker/scans_to_csv/)):**
+1. **Scans to CSV ([`scans_to_csv/`](scans_to_csv/)):**
    - **Stage 1 CLI Engine:** Processes batches of scanned JPG, PNG, and PDF sheets.
    - Self-contained pipeline: includes its own detection engine (`src/`), `template.json`, and `config.json`.
    - Detects corner alignment markers, corrects skew, samples bubble fills, decodes alphanumeric IDs and sets, and writes clean CSV data.
    - Performs built-in anomaly detection (`MULTI` options, incomplete `ID_LEN`, missing `NO_SET`).
-2. **Scoring ([`scoring/`](file:///c:/Acads/omr_checker/scoring/)):**
+2. **Scoring ([`scoring/`](scoring/)):**
    - **Stage 2 Engine & UI:** Reads `output/results.csv` and answer keys, applies marking schemes and multi-mark policies, and exports `output/score.csv`.
    - Built with Python standard library only; works fully offline with an integrated local web UI and headless CLI.
-3. **Template Utilities ([`scripts/`](file:///c:/Acads/omr_checker/scripts/)):**
+3. **Template Utilities ([`scripts/`](scripts/)):**
    - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
-3. **Architecture & Documentation ([`docs/`](file:///c:/Acads/omr_checker/docs/)):**
+3. **Architecture & Documentation ([`docs/`](docs/)):**
    - Multi-milestone architecture plan (`plan.md`) for future scoring, roster validation, and OMR designer phases.
 
 ---
@@ -79,19 +79,36 @@ omr_checker/
 
 ### 1. Prerequisites & Environment Setup
 
-Python 3.10+ is recommended. Install required packages:
+Python 3.10+ is recommended. From the repository root, create and activate a
+virtual environment, then install the scan-reader dependencies:
 
-```bash
-pip install -r scans_to_csv/requirements.txt
-pip install opencv-contrib-python
+**Windows PowerShell**
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r scans_to_csv\requirements.txt
+python -m pip install opencv-contrib-python
 ```
+
+**macOS/Linux**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r scans_to_csv/requirements.txt
+python -m pip install opencv-contrib-python
+```
+
+The designer and scorer use browser/Python standard-library functionality and
+do not require additional packages. Activate `.venv` in each new terminal.
 
 ---
 
 ### 2. Running `scans_to_csv`
 
 #### Default Run (Zero Arguments)
-By default, the script automatically reads all scans in [`input/`](file:///c:/Acads/omr_checker/input/) and outputs to [`output/results.csv`](file:///c:/Acads/omr_checker/output/results.csv):
+By default, the script automatically reads all scans in [`input/`](input/) and outputs to [`output/results.csv`](output/results.csv):
 
 ```bash
 python scans_to_csv/omr_to_csv.py
@@ -132,7 +149,19 @@ python scans_to_csv/omr_to_csv.py --help
 
 ### 3. Designing a New Sheet
 
-Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter (`F20231187H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year, the four digits, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
+Start the designer from the repository root:
+
+```bash
+python -m http.server 8000 --directory designer
+```
+
+Open <http://localhost:8000> in a browser. Stop the server with `Ctrl+C`.
+There is no build step. The form on the left sets the header, instructions, set
+box, options, and number of questions; the right side is the A4 sheet as it
+will print. Questions spread over up to four columns, fewer when there are many
+options, and the form says how many questions fit. The ID grid is fixed to the
+degree (F first degree, H higher degree, P PhD), the year, the last four
+digits, and the campus letter (`F20231187H`).
 
 - **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
 - **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
@@ -158,6 +187,10 @@ python scoring/app.py
 - Step 2: Marking scheme (+4/-1/0, +1/0/0, +3/-1/0, +2/-0.5/0, custom) and multi-mark policy selection.
 - Step 3: Interactive key grid and text paste (`BC-DA...`, where `-` or space denotes uncounted questions).
 - Step 4: Save/load keys, preview first 20 rows with summary stats (mean, min, max, flagged count), and atomic write to `output/score.csv`.
+
+The scorer expects `output/results.csv` from Stage 1. Open the displayed
+`http://127.0.0.1:8765/` address, load or enter an answer key, and save the
+scores. Use `Ctrl+C` to stop the server.
 
 #### Headless CLI
 ```bash
@@ -186,7 +219,7 @@ When a student bubbles two or more options on a question:
 
 ## Output Format & Quality Checks
 
-[`output/results.csv`](file:///c:/Acads/omr_checker/output/results.csv) contains one row per evaluated sheet:
+[`output/results.csv`](output/results.csv) contains one row per evaluated sheet:
 
 ```csv
 "file_id","Set","ID NO","q1","q2",...,"q30","check"

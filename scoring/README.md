@@ -8,6 +8,14 @@ Built using Python standard library only (`csv`, `json`, `decimal`, `http.server
 
 ## 1. Quick Start
 
+From the repository root, activate the virtual environment used by
+`scans_to_csv` (the scoring stage itself uses only the Python standard
+library):
+```bash
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+```
+
 ### Web UI (Offline)
 Launch the local web UI on `127.0.0.1:8765`:
 ```bash
@@ -19,6 +27,8 @@ python scoring/app.py
 - Step 2: Choose a marking scheme preset (+4/-1/0, +1/0/0, +3/-1/0, +2/-0.5/0, or custom) and a multi-mark policy.
 - Step 3: Enter or paste answer keys per Set (e.g. paste string `BC-DA...` where `-` or space represents an uncounted question).
 - Step 4: Save / Load keys, preview first 20 rows with summary statistics, and write `score.csv`.
+Stop the server with `Ctrl+C`. The UI reads `output/results.csv`, which is
+normally produced by `python scans_to_csv/omr_to_csv.py`.
 
 ### Headless CLI
 Score directly from the command line:
@@ -94,4 +104,3 @@ Output row count always equals input row count; no rows are dropped or silently 
 - **Formula Safety:** Text fields (`file_id`, `Set`, `ID NO`) that begin with formula prefix characters (`=`, `+`, `-`, `@`) are prefixed with `'` to prevent spreadsheet formula execution.
 - **Run Audit Sidecar:** Every write produces `output/score_run.json` containing timestamps, SHA-256 hash of the answer key file, marking scheme, multi-mark policy, and input row counts.
 - **Data Privacy:** Scans, results, scores, and answer keys are ignored by git via `.gitignore`.
-
