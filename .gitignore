@@ -49,9 +49,15 @@ tmp/
 # Result spreadsheets and data exports
 results.csv
 Results_*.csv
+score.csv
+scores*.csv
 *.xlsx
 *.xls
 *.csv.tmp
+
+# Scoring answer keys
+scoring/keys/*.json
+!scoring/keys/.gitkeep
 
 # ------------------------------------------------------------------------------
 # Python & Environment Artifacts
