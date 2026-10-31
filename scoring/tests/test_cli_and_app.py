@@ -97,6 +97,7 @@ class TestCliAndApp(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as ctx:
                 urllib.request.urlopen(req)
             self.assertEqual(ctx.exception.code, 403)
+            ctx.exception.close()
 
             # 5. POST /api/preview
             num_q = summary_data["questions"]
