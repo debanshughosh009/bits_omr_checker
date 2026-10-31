@@ -94,14 +94,14 @@ label { cursor: pointer; }
 
 <!-- ════════════════ Step 1: Summary ════════════════ -->
 <div class="card" id="step1">
-  <h2>① Results Summary</h2>
+  <h2>Step 1: Results Summary</h2>
   <div id="summary-content"><p class="info">Loading…</p></div>
-  <div style="margin-top:8px"><button onclick="loadSummary()">↻ Reload</button></div>
+  <div style="margin-top:8px"><button onclick="loadSummary()">Reload</button></div>
 </div>
 
 <!-- ════════════════ Step 2: Scheme + Policy ════════════════ -->
 <div class="card" id="step2">
-  <h2>② Marking Scheme &amp; Multi-Mark Policy</h2>
+  <h2>Step 2: Marking Scheme &amp; Multi-Mark Policy</h2>
   <div class="row" style="margin-bottom:8px">
     <label for="scheme-preset">Preset:</label>
     <select id="scheme-preset" onchange="applyPreset()">
@@ -150,7 +150,7 @@ label { cursor: pointer; }
 
 <!-- ════════════════ Step 3: Answer Keys ════════════════ -->
 <div class="card" id="step3">
-  <h2>③ Answer Keys</h2>
+  <h2>Step 3: Answer Keys</h2>
   <div id="key-tabs-bar" class="tab-bar"></div>
   <div id="key-tabs-content"></div>
   <div class="row" style="margin-top:8px; gap:6px">
@@ -160,18 +160,18 @@ label { cursor: pointer; }
 
 <!-- ════════════════ Step 4: Actions ════════════════ -->
 <div class="card" id="step4">
-  <h2>④ Save / Load / Score</h2>
+  <h2>Step 4: Save / Load / Score</h2>
   <div class="row" style="flex-wrap:wrap; gap:8px">
     <label for="key-name">Key name:</label>
     <input type="text" id="key-name" value="" placeholder="quiz1" size="16" class="mono">
-    <button onclick="saveKeys()">💾 Save Keys</button>
+    <button onclick="saveKeys()">Save Keys</button>
     <select id="key-load-list" style="min-width:120px"><option value="">— load —</option></select>
-    <button onclick="loadKeys()">📂 Load Keys</button>
-    <button onclick="refreshKeyList()">↻</button>
+    <button onclick="loadKeys()">Load Keys</button>
+    <button onclick="refreshKeyList()">Refresh</button>
   </div>
   <div style="margin-top:12px" class="row">
-    <button class="primary" onclick="doPreview()">👁 Preview (first 20 rows)</button>
-    <button class="danger" onclick="doScore()">✏️ Write score.csv</button>
+    <button class="primary" onclick="doPreview()">Preview (first 20 rows)</button>
+    <button class="danger" onclick="doScore()">Write score.csv</button>
   </div>
   <div id="preview-area" style="margin-top:12px"></div>
 </div>
@@ -553,7 +553,7 @@ async function doScore() {
     const body = buildRequestBody();
     const d = await api("POST", "/api/score", body);
     area.innerHTML = `<p class="badge badge-green" style="font-size:14px; padding:6px 12px">
-      ✓ Wrote ${d.rows_written} rows to <span class="mono">${esc(d.path)}</span></p>
+      Wrote ${d.rows_written} rows to <span class="mono">${esc(d.path)}</span></p>
       <p class="info">Run JSON: <span class="mono">${esc(d.run_json)}</span></p>`;
     status("score.csv written.", 5000);
   } catch (e) {
