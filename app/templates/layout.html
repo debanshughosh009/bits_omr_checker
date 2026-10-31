@@ -29,6 +29,7 @@
     <div class="btn-row">
       {% if layout.sheet %}<a class="btn primary" href="{{ url_for('layout_file', layout_id=layout.id, name=layout.sheet) }}">Blank sheet to print ({{ layout.sheet.rsplit('.', 1)[1]|upper }})</a>{% endif %}
       <a class="btn" href="{{ url_for('layout_bundle', layout_id=layout.id) }}">Everything (ZIP)</a>
+      <button type="button" class="btn desktop-only hidden" data-open-folder="layout:{{ layout.id }}" title="Open this layout's folder">Open folder</button>
     </div>
     <ul class="file-list small">
       {% for f in files %}<li><a href="{{ url_for('layout_file', layout_id=layout.id, name=f) }}">{{ f }}</a></li>{% endfor %}

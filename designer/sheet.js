@@ -161,7 +161,7 @@ function layout(s) {
     }
     out.bubbles.push(...bubbles);
     out.fields.push({
-      name: `Q${first}_${last}`, label: `q${first}..${last}`, direction: "horizontal",
+      name: `Q${first}_${last}`, label: first === last ? `q${first}` : `q${first}..${last}`, direction: "horizontal",
       bubbles, gap: opt, rowGap: row, values: opts, d,
     });
   }
@@ -222,7 +222,7 @@ function template(L) {
   }
   const ids = L.fields.filter((f) => f.name.startsWith("ID")).map((f) => f.label);
   const qs = L.fields.filter((f) => f.name.startsWith("Q")).flatMap((f) => {
-    const [a, b] = f.label.slice(1).split("..").map(Number);
+    const [a, b = a] = f.label.slice(1).split("..").map(Number);
     return Array.from({ length: b - a + 1 }, (_, i) => `q${a + i}`);
   });
   return {

@@ -52,6 +52,7 @@
     <div class="btn-row">
       {% if summary.sheets %}<a class="btn" href="{{ url_for('download', exam_id=exam.id, kind='results') }}">results.csv</a>{% endif %}
       {% if has_scores %}<a class="btn primary" href="{{ url_for('download', exam_id=exam.id, kind='scores') }}">scores.csv</a>{% endif %}
+      <button type="button" class="btn desktop-only hidden" data-open-folder="exam:{{ exam.id }}" title="Open this exam's folder (results.csv, scores.csv, scans)">Open folder</button>
     </div>
   </div>
 

@@ -2,11 +2,12 @@
 Make a printable OMR sheet and its template with designer/sheet.js.
 
 designer/sheet.js owns the layout, the printed sheet (SVG) and the template,
-for designer/index.html and for this module alike, so a sheet made in the web
+for designer/index.html and for this module alike, so a sheet made in the
 app is the same sheet designer/index.html prints. This module runs sheet.js
-with node and turns its SVG into a PDF and PNG.
+in an embedded JavaScript engine (QuickJS, or Node.js if QuickJS is not
+installed) and turns its SVG into a PDF and PNG.
 
-    python webapp/sheet_designer.py --out my_sheet/ [--draft draft.json] [--questions 40 --options ABCDE ...]
+    python app/sheet_designer.py --out my_sheet/ [--draft draft.json] [--questions 40 --options ABCDE ...]
 
 --draft takes a draft saved from designer/index.html ("Save"). Writes sheet.pdf
 (print at 100%), sheet.png, template.json, omr_marker.png, preview.png and
@@ -20,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -39,25 +41,19 @@ BOOL_FIELDS = ("showSet",)
 INT_FIELDS = ("questions",)
 
 _DUMP = """
-const S = require(process.argv[1]);
-const s = { ...S.defaults(), ...JSON.parse(process.argv[2]) };
-const L = S.layout(s);
-process.stdout.write(JSON.stringify({
-  settings: s, svg: S.sheetSvg(L), template: S.template(L),
-  issues: L.issues, fit: L.fit, markers: L.markers,
-}));
+function __dump(S, settings) {
+  const s = { ...S.defaults(), ...settings };
+  const L = S.layout(s);
+  return JSON.stringify({
+    settings: s, svg: S.sheetSvg(L), template: S.template(L),
+    issues: L.issues, fit: L.fit, markers: L.markers,
+  });
+}
 """
 
 
 class DesignError(ValueError):
     pass
-
-
-def node_path() -> str:
-    node = shutil.which("node")
-    if not node:
-        raise DesignError("Node.js is needed to run designer/sheet.js; install it or use the Docker image.")
-    return node
 
 
 def clean_settings(raw: dict) -> dict:
@@ -79,13 +75,54 @@ def clean_settings(raw: dict) -> dict:
     return out
 
 
-def run_sheet_js(settings: dict) -> dict:
-    """Run designer/sheet.js: settings -> {settings, svg, template, issues, fit, markers}."""
-    proc = subprocess.run([node_path(), "-e", _DUMP, str(SHEET_JS), json.dumps(clean_settings(settings))],
+_js_lock = threading.Lock()
+_js_ctx = None
+
+
+def _quickjs_context():
+    """A QuickJS context with sheet.js loaded (made once, reused)."""
+    global _js_ctx
+    if _js_ctx is None:
+        import quickjs
+
+        ctx = quickjs.Context()
+        # sheet.js is plain browser/Node JavaScript; QuickJS lacks Array.prototype.at
+        ctx.eval("var module = { exports: {} };"
+                 "if (!Array.prototype.at) Array.prototype.at = function (i) {"
+                 " i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; };")
+        ctx.eval(SHEET_JS.read_text(encoding="utf-8"))
+        ctx.eval(_DUMP)
+        _js_ctx = ctx
+    return _js_ctx
+
+
+def _run_node(settings: dict) -> str:
+    node = shutil.which("node")
+    if not node:
+        raise DesignError("Running designer/sheet.js needs the 'quickjs' Python package "
+                          "(pip install quickjs) or Node.js.")
+    script = _DUMP + "process.stdout.write(__dump(require(process.argv[1]), JSON.parse(process.argv[2])));"
+    proc = subprocess.run([node, "-e", script, str(SHEET_JS), json.dumps(settings)],
                           capture_output=True, text=True, encoding="utf-8")
     if proc.returncode != 0:
         raise DesignError(f"designer/sheet.js failed: {proc.stderr.strip()[-500:]}")
-    return json.loads(proc.stdout)
+    return proc.stdout
+
+
+def run_sheet_js(settings: dict) -> dict:
+    """Run designer/sheet.js: settings -> {settings, svg, template, issues, fit, markers}."""
+    settings = clean_settings(settings)
+    try:
+        import quickjs  # noqa: F401
+    except ImportError:
+        return json.loads(_run_node(settings))
+    with _js_lock:
+        ctx = _quickjs_context()
+        try:
+            out = ctx.eval(f"__dump(module.exports, {json.dumps(settings)})")
+        except Exception as e:
+            raise DesignError(f"designer/sheet.js failed: {e}")
+    return json.loads(out)
 
 
 def defaults() -> dict:

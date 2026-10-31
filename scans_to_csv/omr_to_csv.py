@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -88,13 +89,18 @@ def build_work_dir(
     # characters among its bubbled columns; the engine reads the bubbled columns
     # one by one and clean_csv puts the ID back together.
     tpl = json.loads(template_path.read_text())
+    engine_tpl = dict(tpl)
     if "idColumns" in tpl:
         engine_tpl = {k: v for k, v in tpl.items() if k not in ("idColumns", "customLabels")}
         bubbled = [c for c in tpl["idColumns"] if len(c) > 1]
         engine_tpl["outputColumns"] = [x for c in tpl["outputColumns"] for x in (bubbled if c == "ID NO" else [c])]
-        (work_root / "template.json").write_text(json.dumps(engine_tpl, indent=2))
-    else:
-        shutil.copy2(template_path, work_root / "template.json")
+    # Older designer sheets label a one-question column "q10..10", which the
+    # engine rejects (a range must grow); it means just "q10".
+    engine_tpl["fieldBlocks"] = {
+        name: {**b, "fieldLabels": [re.sub(r"^([^.\d]+)(\d+)\.{2,3}\2$", r"\1\2", l) for l in b.get("fieldLabels", [])]}
+        for name, b in tpl.get("fieldBlocks", {}).items()
+    }
+    (work_root / "template.json").write_text(json.dumps(engine_tpl, indent=2))
 
     # CropOnMarkers needs its marker image beside the template. Sheets from
     # designer/ name one that is not saved with the template, so draw it.

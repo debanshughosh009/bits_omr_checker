@@ -1,5 +1,5 @@
 """
-OMR Checker web app.
+OMR Checker app (the pages shown in the desktop window, see desktop.py).
 
 Designer:  makes a printable sheet + template with designer/sheet.js (the same
            sheet designer/index.html prints), or uploads an existing
@@ -8,7 +8,7 @@ Professor: creates an exam on a layout, enters the answer key on a clickable
            grid, uploads scans (single, batch or ZIP) and downloads
            results.csv (marked options) and scores.csv (scores per student).
 
-Run locally:  python webapp/app.py      (http://localhost:8000)
+Run:  double-click "OMR Checker.bat" (Windows) or omr_checker.command, or python app/desktop.py
 """
 
 import os
@@ -331,8 +331,6 @@ def delete_exam(exam_id):
 pl.seed_default_layout()
 
 if __name__ == "__main__":
-    from waitress import serve
+    from desktop import main  # the app runs in its own window
 
-    port = int(os.environ.get("PORT", "8000"))
-    print(f"OMR Checker running on http://localhost:{port}  (data: {pl.DATA_DIR})")
-    serve(app, host="0.0.0.0", port=port, threads=8, max_request_body_size=app.config["MAX_CONTENT_LENGTH"])
+    main()

@@ -17,7 +17,7 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
      • Sets, BITS ID grid       • Marker alignment           • +4/-1 marking, bonus
      • Printable PDF            • Bubble fill detection      • Multiple-correct answers
      • template.json            • results.csv + flags        • Roster, scores.csv
-                    └──────────── Web app (Docker) runs all three ────────────┘
+                    └──────────── Desktop app runs all three ─────────────────┘
 ```
 
 ### Key Architectural Stages
@@ -29,8 +29,8 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 2. **Scoring ([`scoring/`](scoring/)):**
    - **Stage 2 CLI:** Scores `results.csv` against an answer key and writes `scores.csv`.
    - Per-set keys, configurable marking, bonus questions, "any one of" and "all of" (multiple-correct) answers with optional partial credit, class roster merge.
-3. **Web App ([`webapp/`](webapp/)):**
-   - Browser UI, packaged as a Docker container, that runs the whole pipeline.
+3. **Desktop App ([`app/`](app/)):**
+   - A desktop window, started by double-clicking `OMR Checker.bat`, that runs the whole pipeline.
    - **Designer:** makes a printable sheet and its template with the same sheet designer as [`designer/index.html`](designer/) (both run `designer/sheet.js`), or uploads a custom template.
    - **Professor:** enters the answer key on a clickable grid, uploads scans, fixes flagged sheets, downloads `results.csv` and `scores.csv`.
 4. **Template Utilities ([`scripts/`](scripts/)):**
@@ -40,31 +40,33 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 
 ---
 
-## Quick Start (Web App with Docker)
+## Quick Start (Desktop App)
+
+**Windows:** double-click **`OMR Checker.bat`** in the repository folder.
+**macOS:** double-click **`omr_checker.command`**. **Linux:** run `./omr_checker.command`.
+
+The app opens in its own window. Close the window to quit.
+
+The first start needs [Python 3.10+](https://www.python.org/downloads/) (on Windows, tick "Add python.exe to PATH" when installing) and an internet connection:
+- It makes a private Python environment in `.venv/` and installs the requirements, which takes a few minutes.
+- Later starts open the window straight away.
+
+Everything you make (layouts, exams, scans, CSVs) is kept in `data/` in the repository folder (git-ignored). Each exam and layout page has an **Open folder** button that shows its files.
+
+To make a desktop shortcut on Windows, right-click `OMR Checker.bat` → *Show more options* → *Send to* → *Desktop (create shortcut)*.
+
+Linux also needs a GUI toolkit for the window: `pip install pywebview[qt]` inside `.venv`, or the GTK packages listed in the [pywebview docs](https://pywebview.flowrl.com/guide/installation.html).
+
+Without the launcher:
 
 ```bash
-docker compose up -d --build
-```
-
-Open **http://localhost:8000**. Everything (layouts, exams, scans, CSVs) is stored in the `omr-data` Docker volume and survives restarts and rebuilds.
-
-| Command | What it does |
-|---|---|
-| `docker compose up -d --build` | Build and start (also after pulling code changes) |
-| `docker compose logs -f` | Follow the logs |
-| `docker compose down` | Stop; data is kept |
-| `docker compose down -v` | Stop and **delete all data** |
-
-Without Docker (needs Python and Node.js):
-
-```bash
-pip install -r scans_to_csv/requirements.txt -r webapp/requirements.txt opencv-contrib-python
-python webapp/app.py            # http://localhost:8000, data in ./data (git-ignored)
+pip install -r scans_to_csv/requirements.txt -r app/requirements.txt opencv-contrib-python
+python app/desktop.py
 ```
 
 ---
 
-## Using the Web App
+## Using the App
 
 ### 1. Designer: create a sheet layout
 
@@ -114,18 +116,18 @@ Create an exam on a layout, then enter the key on the clickable grid. There is o
 
 ### 3. Upload scans
 
-Drag in single files, many files, multi-page PDFs or a ZIP. Each batch is added to the exam and processed in the background with a progress bar. A file whose name clashes with an earlier upload is renamed, never overwritten. Files that couldn't be read are listed, along with the processing log.
+Drag in (or choose) single files, many files, multi-page PDFs or a ZIP. Each batch is added to the exam and processed in the background with a progress bar. A file whose name clashes with an earlier upload is renamed, never overwritten. Files that couldn't be read are listed, along with the processing log.
 
 ### 4. Review and download
 
 The results table shows every sheet with its score, counts and flags. You can search it, show only flagged sheets, or show the result for each question.
-- **Scan** opens the annotated image with the detected bubbles marked.
+- **Scan** opens the annotated image with the detected bubbles marked, in a second window.
 - **Fix** corrects a misread ID, set or answer by hand. The sheet is then marked `REVIEWED`.
 - **Remove** drops a sheet from the exam.
 
 Scores are recomputed automatically whenever the key, settings or a sheet changes.
 
-Downloads:
+Downloads (each opens a Save dialog; **Open folder** shows the exam's own copies):
 - **`results.csv`**: marked options per sheet (Stage 1 output)
 - **`scores.csv`**: scores and details per student (Stage 2 output, format below)
 
@@ -136,13 +138,13 @@ Downloads:
 - Partial credit on multiple-correct questions.
 - Class roster CSV (optional). It needs an ID column such as `student_id`, `ID NO` or `id`. Every other column (name, section, …) is copied into `scores.csv`, and roster students without a sheet are listed as `ABSENT`.
 
-There is no login. Run the app on a trusted machine or network. See [`webapp/README.md`](webapp/README.md) for configuration.
+The app only serves its window, on 127.0.0.1. See [`app/README.md`](app/README.md) for how it is put together.
 
 ---
 
 ## Command-Line Usage
 
-The web app calls the same command-line tools, which can also be used on their own.
+The app calls the same command-line tools, which can also be used on their own.
 
 ### Prerequisites
 
@@ -202,11 +204,11 @@ python scans_to_csv/omr_to_csv.py --help
 ### Sheet Designer (command line)
 
 ```bash
-python webapp/sheet_designer.py --out my_sheet/ --course "EEE F111" --exam "Quiz 2" --options ABCDE --questions 40
-python webapp/sheet_designer.py --out my_sheet/ --draft draft_saved_from_designer.json
+python app/sheet_designer.py --out my_sheet/ --course "EEE F111" --exam "Quiz 2" --options ABCDE --questions 40
+python app/sheet_designer.py --out my_sheet/ --draft draft_saved_from_designer.json
 ```
 
-It runs `designer/sheet.js` with Node.js and writes `sheet.pdf`, `sheet.png`, `template.json`, `omr_marker.png`, `preview.png` and `draft.json`.
+It runs `designer/sheet.js` in an embedded JavaScript engine (QuickJS; no Node.js needed) and writes `sheet.pdf`, `sheet.png`, `template.json`, `omr_marker.png`, `preview.png` and `draft.json`.
 
 ### Stage 2: Scoring
 
@@ -283,7 +285,7 @@ Anomaly flags in the `check` column:
 
 - Roster columns (here `name`, `section`) appear only when a roster is given.
 - `multi` counts multi-marked single-answer questions, and `partial` counts multiple-correct questions given partial credit.
-- Per-question columns (`--per-question`, always on in the web app) show `C` correct, `W` wrong, `B` blank, `M` multi-marked, `P` partial, `-` not scored.
+- Per-question columns (`--per-question`, always on in the app) show `C` correct, `W` wrong, `B` blank, `M` multi-marked, `P` partial, `-` not scored.
 
 Extra flags added by scoring:
 - **`NO_ID`**: no student ID read.
@@ -291,7 +293,7 @@ Extra flags added by scoring:
 - **`NOT_IN_ROSTER`**: the ID isn't in the roster.
 - **`ABSENT`**: a roster student has no sheet.
 - **`NO_SET_CANNOT_SCORE`** / **`NO_KEY_FOR_SET(X)`**: the sheet can't be matched to a key.
-- **`REVIEWED`**: corrected by hand in the web app.
+- **`REVIEWED`**: corrected by hand in the app.
 - `MULTI` flags on multiple-correct (`A+C`) questions are removed, because several marks are expected there.
 
 ---
@@ -321,19 +323,21 @@ omr_checker/
 │   ├── score_omr.py        # Scoring CLI
 │   ├── answer_key_example.csv
 │   └── README.md
-├── webapp/                 # Web app: designer & professor UI, runs Stage 1 + 2
-│   ├── app.py              # Flask routes
+├── app/                    # Desktop app: designer & professor UI, runs Stage 1 + 2
+│   ├── desktop.py          # Opens the app window (pywebview)
+│   ├── app.py              # The pages (Flask routes) shown in the window
 │   ├── pipeline.py         # Storage, layouts, exams, background processing
-│   ├── sheet_designer.py   # Runs designer/sheet.js; draws its SVG as PDF/PNG
-│   ├── run_stage1.py       # Runs Stage 1 without a display (containers)
+│   ├── sheet_designer.py   # Runs designer/sheet.js (QuickJS); draws its SVG as PDF/PNG
+│   ├── run_stage1.py       # Runs Stage 1 without opening display windows
 │   ├── templates/, static/ # Pages, styles, answer key editor
 │   └── README.md
 ├── designer/               # Static sheet designer: open index.html, print the sheet, save template.json
 │   ├── index.html          # Form on the left, A4 sheet on the right
 │   ├── sheet.js            # The layout both the printout and the template come from
 │   └── app.js              # The form
-├── Dockerfile              # Container for the web app
-├── docker-compose.yml      # `docker compose up -d --build` -> http://localhost:8000
+├── OMR Checker.bat         # Windows: double-click to start the app
+├── omr_checker.command     # macOS/Linux launcher
+├── data/                   # App data: layouts, exams, scans, CSVs [git-ignored]
 ├── docs/                   # Multi-milestone roadmap & documentation
 │   ├── plan.md             # Master architecture roadmap (M0-M8)
 │   ├── bits_omr_README.md  # Sheet layout calibration notes

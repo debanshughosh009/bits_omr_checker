@@ -1,0 +1,4 @@
+flask>=3.0
+waitress>=3.0
+pywebview>=5.0
+quickjs>=1.19
