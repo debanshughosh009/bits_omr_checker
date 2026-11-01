@@ -93,6 +93,7 @@ Output row count always equals input row count; no rows are dropped or silently 
 - `UNKNOWN_SET:<X>`: Set `<X>` was not in {A..D} and not in the keys. Score columns are left blank.
 - `ALL_BLANK`: Student left all question bubbles blank. Sheet is scored (receiving unattempted marks) and flagged.
 - `DUPLICATE_ID:<id>`: The non-empty student ID appears on multiple sheets. All involved rows are flagged.
+- `INVALID_ID`: One or more ID bubbles were blank or multi-marked.
 - `REVIEW`: One or more questions were held for human review under policy `hold`.
 
 ---

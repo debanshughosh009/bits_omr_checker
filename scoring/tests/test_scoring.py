@@ -174,6 +174,13 @@ class TestScoring(unittest.TestCase):
         self.assertEqual(scored[4]["score"], Decimal("8"))
         self.assertEqual(scored[5]["score"], Decimal("3"))  # 4 - 1
 
+    def test_invalid_id_is_added_to_score_status(self):
+        row = {"file_id": "f.jpg", "Set": "A", "ID NO": "short",
+               "q1": "A", "check": "ID_INVALID"}
+        scored = score_all([row], {"A": ["A"]}, Decimal("1"),
+                           Decimal("0"), Decimal("0"), "zero", ["q1"])
+        self.assertIn("INVALID_ID", scored[0]["score_status"])
+
     # -----------------------------------------------------------------------
     # 4. Fractional marks exact (Decimal vs float drift)
     # -----------------------------------------------------------------------

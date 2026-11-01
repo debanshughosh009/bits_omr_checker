@@ -204,8 +204,14 @@ def clean_csv(
 
     # Build 'check' column
     checks = []
-    for _, row in clean.iterrows():
+    for index, row in clean.iterrows():
         notes = []
+
+        if id_columns and any(
+            len(str(df.loc[index].get(column, "")).strip()) != 1
+            for column in id_columns if len(column) > 1
+        ):
+            notes.append("ID_INVALID")
 
         # Multi-marked questions
         multi_qs = []
@@ -219,7 +225,7 @@ def clean_csv(
         # ID length check (if ID NO column exists)
         if "ID NO" in output_columns:
             id_val = str(row.get("ID NO", "")).strip()
-            if id_val and len(id_val) != id_len:
+            if len(id_val) != id_len:
                 notes.append(f"ID_LEN({len(id_val)}/{id_len})")
 
         # Set check

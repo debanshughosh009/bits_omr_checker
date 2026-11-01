@@ -264,6 +264,9 @@ def score_all(rows, keys_by_set, marks_correct, marks_wrong,
             else:
                 statuses.append(f"UNKNOWN_SET:{set_val}")
 
+        if isinstance(check, str) and ("ID_INVALID" in check or "ID_LEN(" in check):
+            statuses.append("INVALID_ID")
+
         # Check ALL_BLANK (all q columns empty)
         all_blank = all(row.get(qc, "").strip() == "" for qc in q_columns)
         if all_blank:
