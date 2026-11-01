@@ -5,35 +5,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OMR Scoring</title>
 <style>
-/* ── Reset & Base ───────────────────────────────────────────────── */
+/* Keep the scorer visually aligned with the OMR Sheet Designer. */
+:root {
+  --bg: #111113;
+  --panel: #18181b;
+  --ink: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: #2e2e33;
+  --field: #111113;
+  --sunken: #141416;
+  --accent: #f4f4f5;
+  --accent-ink: #18181b;
+  --warn: #fbbf24;
+  --error: #f87171;
+  --ok: #4ade80;
+  color-scheme: dark;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 15px; line-height: 1.5; color: #1a1a1a; background: #f5f6f8;
-  padding: 24px; max-width: 960px; margin: 0 auto;
+  font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--bg);
+  padding: 24px 16px 64px; max-width: 1000px; margin: 0 auto;
 }
 h1 { font-size: 1.5rem; margin-bottom: 4px; }
-h2 { font-size: 1.15rem; margin: 20px 0 8px; border-bottom: 2px solid #ddd; padding-bottom: 4px; }
-h3 { font-size: 1rem; margin: 12px 0 6px; }
+h2 { font-size: 1.15rem; margin: 20px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+h3 { font-size: 1rem; margin: 18px 0 6px; }
 button {
-  cursor: pointer; padding: 6px 16px; border: 1px solid #999; border-radius: 4px;
-  background: #fff; font-size: 14px;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 13px;
+  cursor: pointer; white-space: nowrap;
+  transition: background-color .15s, border-color .15s, box-shadow .15s, transform .05s;
 }
-button:hover { background: #e8e8e8; }
-button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-button.primary:hover { background: #1d4ed8; }
-button.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
-button.danger:hover { background: #b91c1c; }
+button:hover { background: var(--sunken); border-color: var(--muted); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+button.primary:hover { background: var(--accent); opacity: .9; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+button.danger { background: transparent; color: #fca5a5; border-color: #7f1d1d; }
+button.danger:hover { background: #450a0a; border-color: #ef4444; }
 select, input[type="text"], input[type="number"] {
-  padding: 4px 8px; border: 1px solid #bbb; border-radius: 4px; font-size: 14px;
+  display: inline-block; padding: 7px 9px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--field); color: var(--ink);
+  font: inherit; font-size: 13px;
 }
+select:hover, input:hover { border-color: var(--muted); }
+select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 label { cursor: pointer; }
 .mono { font-family: "Cascadia Code", "Fira Code", Consolas, monospace; font-size: 13px; }
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 .card {
-  background: #fff; border: 1px solid #ddd; border-radius: 8px;
-  padding: 16px 20px; margin-bottom: 16px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 18px 20px 20px; margin-bottom: 16px;
 }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .row > label { min-width: 140px; }
@@ -41,50 +65,50 @@ label { cursor: pointer; }
   display: inline-block; padding: 1px 8px; border-radius: 10px;
   font-size: 12px; font-weight: 600;
 }
-.badge-blue { background: #dbeafe; color: #1e40af; }
-.badge-amber { background: #fef3c7; color: #92400e; }
-.badge-red { background: #fee2e2; color: #991b1b; }
-.badge-green { background: #d1fae5; color: #065f46; }
-.info { color: #555; font-size: 13px; margin-top: 2px; }
-.warning { color: #b45309; font-size: 13px; }
-.error { color: #dc2626; font-size: 13px; }
+.badge-blue { background: #1e3a8a; color: #bfdbfe; }
+.badge-amber { background: #78350f; color: #fde68a; }
+.badge-red { background: #7f1d1d; color: #fecaca; }
+.badge-green { background: #064e3b; color: #a7f3d0; }
+.info { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.warning { color: var(--warn); font-size: 13px; }
+.error { color: var(--error); font-size: 13px; }
 #status-bar {
   position: fixed; bottom: 0; left: 0; right: 0;
-  background: #1e293b; color: #e2e8f0; padding: 6px 20px;
+  background: var(--panel); color: var(--ink); border-top: 1px solid var(--line); padding: 6px 20px;
   font-size: 13px; display: none; z-index: 100;
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────── */
-.tab-bar { display: flex; gap: 2px; border-bottom: 2px solid #ddd; margin-bottom: 12px; }
+.tab-bar { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .tab-btn {
   padding: 6px 16px; border: 1px solid transparent; border-bottom: none;
-  border-radius: 6px 6px 0 0; background: #eee; font-size: 14px; cursor: pointer;
+  border-radius: 6px 6px 0 0; background: var(--sunken); color: var(--muted); font-size: 14px; cursor: pointer;
 }
-.tab-btn.active { background: #fff; border-color: #ddd; font-weight: 600; position: relative; top: 2px; }
+.tab-btn.active { background: var(--panel); color: var(--ink); border-color: var(--line); font-weight: 600; position: relative; top: 1px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
 /* ── Key Grid ───────────────────────────────────────────────────── */
 .key-grid { width: 100%; border-collapse: collapse; margin-top: 8px; }
 .key-grid th, .key-grid td {
-  padding: 3px 6px; text-align: center; border: 1px solid #e5e7eb; font-size: 13px;
+  padding: 3px 6px; text-align: center; border: 1px solid var(--line); font-size: 13px;
 }
-.key-grid th { background: #f3f4f6; font-weight: 600; position: sticky; top: 0; }
+.key-grid th { background: var(--sunken); font-weight: 600; position: sticky; top: 0; }
 .key-grid td label { display: block; }
 .key-grid input[type="radio"] { margin: 0; }
-.key-grid-wrap { max-height: 480px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+.key-grid-wrap { max-height: 480px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
 
 /* ── Preview Table ──────────────────────────────────────────────── */
 .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-.preview-table th, .preview-table td { padding: 4px 8px; border: 1px solid #e5e7eb; text-align: left; }
-.preview-table th { background: #f3f4f6; position: sticky; top: 0; }
-.preview-table tr:nth-child(even) { background: #fafafa; }
-.preview-wrap { max-height: 400px; overflow: auto; border: 1px solid #ddd; border-radius: 4px; }
+.preview-table th, .preview-table td { padding: 4px 8px; border: 1px solid var(--line); text-align: left; }
+.preview-table th { background: var(--sunken); position: sticky; top: 0; }
+.preview-table tr:nth-child(even) { background: var(--sunken); }
+.preview-wrap { max-height: 400px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
 
 /* ── Radio-group (policy) ───────────────────────────────────────── */
 .policy-group { display: flex; flex-direction: column; gap: 4px; }
 .policy-option { display: flex; align-items: baseline; gap: 6px; }
-.policy-option .desc { color: #555; font-size: 13px; }
+.policy-option .desc { color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -580,4 +604,3 @@ window.addEventListener("DOMContentLoaded", () => {
 </script>
 </body>
 </html>
-

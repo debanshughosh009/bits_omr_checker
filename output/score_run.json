@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-11-01T06:26:05.057432+00:00",
+  "marking_scheme": {
+    "marks_correct": "4",
+    "marks_wrong": "-1",
+    "marks_unattempted": "0"
+  },
+  "multi_mark_policy": "zero",
+  "key_file": "C:\\Acads\\omr_checker\\scoring\\keys\\ui_session.json",
+  "key_file_sha256": "0ac90fb00c798605aa9b4896149b7cbedf2c67e317e0b11b0f1f24ba5be05667",
+  "results_csv_row_count": 1,
+  "per_question_marks": false
+}
