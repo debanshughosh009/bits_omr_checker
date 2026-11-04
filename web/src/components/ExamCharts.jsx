@@ -4,6 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const LOW = 0.2; // fewer than this share right usually means a wrong key
+
+// One tooltip row: the bar's colour, a label, and the value aligned right
+const tip = (color, label, value) => (
+  <div className="flex w-full items-center gap-2">
+    <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: color }} />
+    <span className="text-muted-foreground">{label}</span>
+    <span className="ml-auto pl-3 font-mono font-medium text-foreground tabular-nums">{value}</span>
+  </div>
+);
 const MIN_SHEETS = 5; // below this the share says nothing about the key
 
 function bins(scored, max) {
@@ -44,7 +53,7 @@ export default function ExamCharts({ scored, stats, info }) {
               <CartesianGrid vertical={false} />
               <XAxis dataKey="range" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} />
-              <ChartTooltip cursor={{ fill: "var(--muted)" }} content={<ChartTooltipContent labelFormatter={(l) => `Marks ${l}`} />} />
+              <ChartTooltip cursor={{ fill: "var(--muted)" }} content={<ChartTooltipContent labelFormatter={(l) => `Marks ${l}`} formatter={(v) => tip("var(--chart-2)", "Sheets", v)} />} />
               <Bar dataKey="sheets" fill="var(--color-sheets)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ChartContainer>
@@ -65,7 +74,8 @@ export default function ExamCharts({ scored, stats, info }) {
               <CartesianGrid vertical={false} />
               <XAxis dataKey="q" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
               <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} width={40} />
-              <ChartTooltip cursor={{ fill: "var(--muted)" }} content={<ChartTooltipContent labelFormatter={(l) => `Question ${l}`} />} />
+              <ChartTooltip cursor={{ fill: "var(--muted)" }} content={<ChartTooltipContent labelFormatter={(l) => `Question ${l}`}
+                formatter={(v, _, item) => tip(isLow(item.payload) ? "var(--destructive)" : "var(--chart-2)", "Fully right", `${v}%`)} />} />
               <Bar dataKey="right" radius={[4, 4, 0, 0]}>
                 {right.map((x) => <Cell key={x.q} fill={isLow(x) ? "var(--destructive)" : "var(--color-right)"} />)}
               </Bar>
