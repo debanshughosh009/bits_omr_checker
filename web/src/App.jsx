@@ -43,6 +43,9 @@ export default function App() {
   const [version, setVersion] = useState(null);
   useEffect(() => {
     fetch('/api/version').then((r) => r.json()).then((v) => setVersion(v.version), () => {});
+    // the packaged app's server stops a few minutes after the last open window stops checking in
+    const ping = setInterval(() => fetch('/api/ping').catch(() => {}), 20000);
+    return () => clearInterval(ping);
   }, []);
 
   return (
