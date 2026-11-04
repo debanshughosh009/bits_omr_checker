@@ -63,6 +63,7 @@ __pycache__/
 .Python
 build/
 dist/
+!web/dist/
 *.egg-info/
 
 # Virtual Environments
@@ -79,3 +80,8 @@ env/
 .DS_Store
 Thumbs.db
 ehthumbs.db
+# Local app data (SQLite database, uploaded scans, overlays)
+data/
+
+# Web app dependencies (web/dist is committed, so running needs only Python)
+node_modules/
