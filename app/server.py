@@ -23,6 +23,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -181,6 +182,8 @@ def is_template(tpl) -> bool:
 # ---------- reading scans with scans_to_csv ----------
 
 read_lock = threading.Lock()  # ponytail: one batch at a time across exams; per-exam locks if several people share a machine
+PROGRESS = {}  # exam id -> {"done", "total"} while its scans are being read, for the page's progress bar
+STARTED = re.compile(r"\((\d+)\) Opening image")  # the reader logs this as it starts each sheet (scans_to_csv/src/entry.py)
 
 
 def read_scans(exam_id: int, template: dict):
@@ -193,14 +196,25 @@ def read_scans(exam_id: int, template: dict):
     (d / "template.json").write_text(json.dumps(template, indent=2))
     out = d / "results.csv"
     out.unlink(missing_ok=True)
-    with read_lock:
-        # the packaged app has no separate Python, so it runs itself as the reader
-        reader = [sys.executable, "--reader"] if FROZEN else [sys.executable, str(STAGE / "omr_to_csv.py")]
-        p = subprocess.run([*reader, "--config", str(STAGE / "config.json"), "--scans", str(incoming), "--template", str(d / "template.json"),
-                            "--out", str(out), "--overlays", str(d / "overlays")],
-                           capture_output=True, text=True, cwd=d, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    PROGRESS[exam_id] = {"done": 0, "total": len(files)}
+    try:
+        with read_lock:
+            # the packaged app has no separate Python, so it runs itself as the reader
+            reader = [sys.executable, "--reader"] if FROZEN else [sys.executable, str(STAGE / "omr_to_csv.py")]
+            p = subprocess.Popen([*reader, "--config", str(STAGE / "config.json"), "--scans", str(incoming), "--template", str(d / "template.json"),
+                                  "--out", str(out), "--overlays", str(d / "overlays")],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", cwd=d,
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            tail = []
+            for line in p.stdout:  # follow the reader sheet by sheet
+                if m := STARTED.search(line):
+                    PROGRESS[exam_id]["done"] = min(int(m.group(1)) - 1, len(files))
+                tail = (tail + [line.rstrip()])[-15:]
+            p.wait()
+    finally:
+        PROGRESS.pop(exam_id, None)
     if p.returncode or not out.exists():
-        return {"error": "The reader failed:\n" + "\n".join((p.stderr or p.stdout).strip().splitlines()[-15:])}
+        return {"error": "The reader failed:\n" + "\n".join(tail)}
 
     with open(out, newline="") as f:
         rows = list(csv.DictReader(f))
@@ -319,6 +333,8 @@ class Handler(SimpleHTTPRequestHandler):
                     con.execute("DELETE FROM exams WHERE id = ?", (exam_id,))
                     shutil.rmtree(exam_dir(exam_id), ignore_errors=True)
                     return self.send_json({"ok": True})
+                if p[2:] == ["progress"] and method == "GET":  # how far reading has got, while it runs
+                    return self.send_json(PROGRESS.get(exam_id) or {"done": 0, "total": 0})
                 if p[2:] == ["scans"] and method == "POST":
                     name = Path(q["name"][0]).name
                     if Path(name).suffix.lower() not in SCAN_EXTS:
