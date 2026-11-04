@@ -71,7 +71,7 @@ omr_checker/
 
 ### The app (dashboard, designer and evaluator, one click)
 
-Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in your browser at `http://127.0.0.1:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
+Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in its own window at `http://localhost:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
 
 - **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the original 30-question sheet or any `template.json`.
 - **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
@@ -95,7 +95,7 @@ Releases ship OMR Checker as an installed app, with no Python, Node or terminal 
 - **macOS:** `OMR-Checker-<version>-mac-arm64.dmg` (Apple Silicon) or `-mac-x64.dmg` (Intel). Open it and drag OMR Checker to Applications.
 - **Windows:** `OMR-Checker-<version>-windows-setup.exe`, a per-user installer (no admin rights) with Start menu and optional desktop shortcuts and an uninstaller.
 
-The app runs from the menu bar (macOS) or notification area (Windows), with **Open OMR Checker** and **Quit**, and opens in the default browser. Its data lives in `~/Library/Application Support/OMR Checker` or `%LOCALAPPDATA%\OMR Checker`. The builds are not code-signed yet, so the first launch needs right-click → Open on macOS (or System Settings → Privacy & Security → Open Anyway), and More info → Run anyway on Windows SmartScreen.
+Opening the app starts it in the background and opens it in its own window, with no tabs or address bar. It uses the default browser's app mode when that is Chrome, Edge or Brave, and otherwise the first of those installed; with none of them it opens a normal browser tab. Opening it again while it runs opens another window. A few minutes after the last window closes, it stops by itself, and nothing stays in the menu bar or Dock. Its data lives in `~/Library/Application Support/OMR Checker` or `%LOCALAPPDATA%\OMR Checker`. The builds are not code-signed yet, so the first launch needs right-click → Open on macOS (or System Settings → Privacy & Security → Open Anyway), and More info → Run anyway on Windows SmartScreen.
 
 **Building one locally** (Python 3.12 recommended):
 
