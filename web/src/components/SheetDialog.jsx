@@ -10,10 +10,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { keyText, scoreSheet } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
+// The question number takes the colour of how the answer scored
 const TONE = {
-  correct: "border-l-emerald-500", bonus: "border-l-emerald-500",
-  partial: "border-l-amber-500", wrong: "border-l-red-500",
-  blank: "border-l-transparent", dropped: "border-l-transparent",
+  correct: "text-emerald-600 dark:text-emerald-400", bonus: "text-emerald-600 dark:text-emerald-400",
+  partial: "text-amber-600 dark:text-amber-400", wrong: "text-red-600 dark:text-red-400",
 };
 
 export default function SheetDialog({ row, results, onSave, onRemove, onClose }) {
@@ -32,11 +32,11 @@ export default function SheetDialog({ row, results, onSave, onRemove, onClose })
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2">
             {row.sheet.file}
-            {row.sheet.edited && <Badge variant="outline">edited</Badge>}
+            {row.sheet.edited && <Badge variant="outline">Corrected by hand</Badge>}
             {row.flags.map((f) => <Badge key={f} variant="destructive">{f}</Badge>)}
           </DialogTitle>
           <DialogDescription>
-            {r.score === null ? `Not marked: ${r.reason}.` : `${r.score} / ${r.max} with the set ${r.keySet || ""} key · ${r.correct} right, ${r.partial} partly, ${r.wrong} wrong, ${r.blank} blank.`}
+            {r.score === null ? `Not marked: ${r.reason}.` : `${r.score} / ${r.max} with the set ${r.keySet || ""} key · ${r.correct} right, ${results.hasMulti ? `${r.partial} partly, ` : ""}${r.wrong} wrong, ${r.blank} blank.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -66,10 +66,10 @@ export default function SheetDialog({ row, results, onSave, onRemove, onClose })
                 {info.questions.map((q, i) => {
                   const p = r.perQ[i];
                   return (
-                    <label key={q} className={cn("grid grid-cols-[2rem_4rem_1fr] items-center gap-2 rounded-md border-l-[3px] py-0.5 pl-1.5 text-sm", TONE[p?.result] ?? "border-l-transparent")}>
-                      <span className="text-right text-muted-foreground tabular-nums">{q.slice(1)}</span>
+                    <label key={q} className="grid grid-cols-[2rem_4rem_1fr] items-center gap-2 py-0.5 text-sm">
+                      <span className={cn("text-right font-semibold tabular-nums", TONE[p?.result] ?? "text-muted-foreground")}>{q.slice(1)}</span>
                       <Input value={data[q] ?? ""} onChange={(e) => set(q, e.target.value)} className="h-7 px-2 font-mono" aria-label={`Question ${q.slice(1)}`} />
-                      <span className="truncate text-xs text-muted-foreground tabular-nums">{p ? `${keyText(p.key) || "?"} · ${p.marks > 0 ? "+" : ""}${p.marks}` : ""}</span>
+                      <span className="truncate font-mono text-xs text-muted-foreground" title="Answer key">{p ? keyText(p.key) || "?" : ""}</span>
                     </label>
                   );
                 })}
