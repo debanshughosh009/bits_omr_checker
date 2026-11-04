@@ -4,7 +4,7 @@
 
 Run with a Python that has packaging/requirements.txt installed (3.12 is what the
 release workflow uses), after `npm run build` in web/. Writes to release/:
-  macOS    OMR-Checker-<version>-mac-<arch>.dmg   (the .app, with an Applications link)
+  macOS    OMR-Checker-<version>-mac-apple-silicon.dmg or -mac-intel.dmg (the .app, with an Applications link)
   Windows  OMR-Checker-<version>-windows-setup.exe (needs Inno Setup's ISCC on PATH)"""
 import os
 import platform
@@ -33,7 +33,7 @@ def main():
     OUT.mkdir(exist_ok=True)
 
     if sys.platform == "darwin":
-        arch = "arm64" if platform.machine() == "arm64" else "x64"
+        arch = "apple-silicon" if platform.machine() == "arm64" else "intel"
         stage = work / "dmg"
         shutil.rmtree(stage, ignore_errors=True)
         stage.mkdir()

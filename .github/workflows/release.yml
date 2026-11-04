@@ -84,6 +84,14 @@ jobs:
           name: OMR Checker ${{ github.ref_name }}
           files: release/*
           body: |
-            **macOS:** download the `.dmg` for your Mac (`arm64` for Apple Silicon, `x64` for Intel), open it and drag OMR Checker to Applications. The app is not signed yet: the first time, right-click it and choose Open (on macOS 15, allow it under System Settings → Privacy & Security).
-            **Windows:** run `OMR-Checker-…-windows-setup.exe`. It is not signed yet: if SmartScreen warns, choose More info → Run anyway.
-            OMR Checker runs from the menu bar / notification area and opens in your browser. Scans and results stay on your computer.
+            Design OMR sheets, scan them, and get the marks. Everything stays on your computer.
+
+            ### Mac
+            1. Download **mac-apple-silicon.dmg** (M1, M2, M3, M4) or **mac-intel.dmg** (older Macs). Not sure? Apple menu → About This Mac → Chip.
+            2. Open it and drag **OMR Checker** into **Applications**.
+            3. Open OMR Checker. The first time, macOS blocks it: go to **System Settings → Privacy & Security**, click **Open Anyway**, then **Open**.
+
+            ### Windows
+            1. Download **windows-setup.exe** and run it.
+            2. If Windows says it protected your PC: click **More info**, then **Run anyway**.
+            3. Open **OMR Checker** from the Start menu.

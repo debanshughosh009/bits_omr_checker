@@ -92,7 +92,7 @@ Marks are recalculated as you change the key or the scheme, and the scheme page 
 
 Releases ship OMR Checker as an installed app, with no Python, Node or terminal needed:
 
-- **macOS:** `OMR-Checker-<version>-mac-arm64.dmg` (Apple Silicon) or `-mac-x64.dmg` (Intel). Open it and drag OMR Checker to Applications.
+- **macOS:** `OMR-Checker-<version>-mac-apple-silicon.dmg` or `-mac-intel.dmg`. Open it and drag OMR Checker to Applications.
 - **Windows:** `OMR-Checker-<version>-windows-setup.exe`, a per-user installer (no admin rights) with Start menu and optional desktop shortcuts and an uninstaller.
 
 Opening the app starts it in the background and opens it in its own window, with no tabs or address bar. It uses the default browser's app mode when that is Chrome, Edge or Brave, and otherwise the first of those installed; with none of them it opens a normal browser tab. Opening it again while it runs opens another window. A few minutes after the last window closes, it stops by itself, and nothing stays in the menu bar or Dock. Its data lives in `~/Library/Application Support/OMR Checker` or `%LOCALAPPDATA%\OMR Checker`. The builds are not code-signed yet, so the first launch needs right-click → Open on macOS (or System Settings → Privacy & Security → Open Anyway), and More info → Run anyway on Windows SmartScreen.
