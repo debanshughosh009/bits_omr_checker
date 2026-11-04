@@ -72,7 +72,7 @@ export default function Exam({ id }) {
     const head = ["file", "ID NO", "Set", "score", "max", "correct", "partial", "wrong", "blank", "check", ...info.questions];
     const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const rows = results.rows.map(({ sheet, r, flags }) => [sheet.file, sheet.data["ID NO"], sheet.data.Set, r.score, r.max, r.correct, r.partial, r.wrong, r.blank,
-      [...flags, sheet.edited && "edited"].filter(Boolean).join(", "), ...info.questions.map((q) => sheet.data[q])]);
+      [...flags, sheet.edited && "Corrected by hand"].filter(Boolean).join(", "), ...info.questions.map((q) => sheet.data[q])]);
     download(`${name.replace(/[^\w-]+/g, "_")}_marks.csv`, [head, ...rows].map((r) => r.map(cell).join(",")).join("\n"), "text/csv");
   }
 
@@ -85,9 +85,9 @@ export default function Exam({ id }) {
 
   const keyedSets = (info.sets.length ? info.sets : [""]).filter((s) => (keyTexts[s] || "").trim());
   const nav = [
-    { id: "results", label: "Scans & marks", icon: ScanLine, note: stats.sheets ? `${stats.sheets} read${exam.waiting ? `, ${exam.waiting} waiting` : ""}` : exam.waiting ? `${exam.waiting} waiting` : "No scans yet" },
-    { id: "key", label: "Answer key", icon: KeyRound, note: info.sets.length ? `${keyedSets.length} of ${info.sets.length} sets` : keyedSets.length ? "Entered" : "Not entered", alert: !hasKey },
     { id: "scheme", label: "Marking scheme", icon: Calculator, note: `${fmt(results.rules.single.correct)} / ${fmt(results.rules.single.wrong)} · ${MULTI_MODES[results.rules.multiple.mode].split(":")[0]}` },
+    { id: "key", label: "Answer key", icon: KeyRound, note: info.sets.length ? `${keyedSets.length} of ${info.sets.length} sets` : keyedSets.length ? "Entered" : "Not entered", alert: !hasKey },
+    { id: "results", label: "Scans & marks", icon: ScanLine, note: stats.sheets ? `${stats.sheets} read${exam.waiting ? `, ${exam.waiting} waiting` : ""}` : exam.waiting ? `${exam.waiting} waiting` : "No scans yet" },
   ];
 
   return (
@@ -170,7 +170,18 @@ function Scans({ exam, onRead }) {
   const [over, setOver] = useState(false);
   const [upload, setUpload] = useState(null); // {done, total}
   const [reading, setReading] = useState(false);
+  const [progress, setProgress] = useState(null); // {done, total, since} while reading
   const input = useRef();
+
+  // follow the server while it reads, for the progress bar
+  useEffect(() => {
+    if (!reading) return setProgress(null);
+    const since = Date.now();
+    const poll = setInterval(() => {
+      api(`exams/${exam.id}/progress`).then((p) => p.total && setProgress({ ...p, since }), () => {});
+    }, 1000);
+    return () => clearInterval(poll);
+  }, [reading, exam.id]);
 
   async function add(files) {
     files = [...files];
@@ -204,6 +215,7 @@ function Scans({ exam, onRead }) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Scans</CardTitle>
@@ -222,15 +234,37 @@ function Scans({ exam, onRead }) {
           className={cn("grid w-full place-items-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center text-sm transition-colors hover:bg-muted/50", over && "border-primary bg-muted/50")}>
           <span className="grid size-10 place-items-center rounded-full bg-muted"><Upload className="size-5 text-muted-foreground" /></span>
           <span><span className="font-medium">Drop scans here</span> <span className="text-muted-foreground">or click to choose files</span></span>
-          {reading && <span className="text-xs text-muted-foreground">About a second a sheet. Keep this page open.</span>}
         </button>
         <input ref={input} type="file" multiple accept=".jpg,.jpeg,.png,.pdf" hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />
-        {upload && (
-          <div className="mt-4 grid gap-1.5 text-xs text-muted-foreground">
-            Uploading {upload.done + 1} of {upload.total}
-            <Progress value={(upload.done / upload.total) * 100} />
-          </div>
-        )}
+      </CardContent>
+    </Card>
+    {(upload || reading) && <ProgressCard upload={upload} reading={reading} progress={progress} />}
+    </>
+  );
+}
+
+function ProgressCard({ upload, reading, progress }) {
+  let label, value, detail;
+  if (upload) {
+    label = `Uploading ${upload.done + 1} of ${upload.total}`;
+    value = (upload.done / upload.total) * 100;
+  } else if (progress) {
+    label = `Reading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`;
+    value = (progress.done / progress.total) * 100;
+    const secs = progress.done ? ((Date.now() - progress.since) / progress.done) * (progress.total - progress.done) / 1000 : null;
+    detail = secs === null ? "Starting…" : secs < 60 ? "Less than a minute left" : `About ${Math.round(secs / 60)} min left`;
+  } else {
+    label = "Starting the reader…";
+    value = 0;
+  }
+  return (
+    <Card className="gap-3 py-4" role="status" aria-live="polite">
+      <CardContent className="grid gap-2 px-4">
+        <div className="flex items-center justify-between gap-4 text-sm">
+          <span className="flex items-center gap-2 font-medium"><Loader2 className="size-4 animate-spin text-muted-foreground" />{label}</span>
+          <span className="text-xs text-muted-foreground">{detail ?? (reading ? "Keep this page open" : "")}</span>
+        </div>
+        <Progress value={value} />
       </CardContent>
     </Card>
   );
@@ -246,6 +280,8 @@ function Results({ results, onChange }) {
     (only === "all" || x.flags.length) &&
     (!q || `${x.sheet.file} ${x.sheet.data["ID NO"] || ""}`.toLowerCase().includes(q.toLowerCase())));
   const current = results.rows.find((x) => x.sheet.id === open);
+  // "partly right" only happens on multiple-correct questions
+  const counts = results.hasMulti ? ["correct", "partial", "wrong", "blank"] : ["correct", "wrong", "blank"];
 
   async function save(sheet, data) {
     try {
@@ -294,8 +330,11 @@ function Results({ results, onChange }) {
                 <TableHead>Email</TableHead>
                 <TableHead>Set</TableHead>
                 <TableHead className="text-right">Score</TableHead>
-                <TableHead className="text-right" title="Right / partly right / wrong / blank">R / P / W / B</TableHead>
-                <TableHead>Review</TableHead>
+                <TableHead className="text-right">Right</TableHead>
+                {results.hasMulti && <TableHead className="text-right">Partly</TableHead>}
+                <TableHead className="text-right">Wrong</TableHead>
+                <TableHead className="text-right">Blank</TableHead>
+                <TableHead className="pl-8">Review</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -305,16 +344,18 @@ function Results({ results, onChange }) {
                   <TableCell className="font-mono text-xs">{sheet.data["ID NO"] || <span className="text-muted-foreground">–</span>}</TableCell>
                   <TableCell>{sheet.data.Set || <span className="text-muted-foreground">–</span>}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{r.score === null ? <span className="text-muted-foreground">–</span> : <>{fmt(r.score, 2)}<span className="text-muted-foreground"> / {r.max}</span></>}</TableCell>
-                  <TableCell className="text-right text-muted-foreground tabular-nums">{r.score === null ? "" : `${r.correct} / ${r.partial} / ${r.wrong} / ${r.blank}`}</TableCell>
-                  <TableCell>
+                  {counts.map((k) => (
+                    <TableCell key={k} className="text-right text-muted-foreground tabular-nums">{r.score === null ? "" : r[k]}</TableCell>
+                  ))}
+                  <TableCell className="pl-8">
                     <div className="flex flex-wrap gap-1">
                       {flags.map((f) => <Badge key={f} variant="destructive">{f}</Badge>)}
-                      {sheet.edited && <Badge variant="outline">edited</Badge>}
+                      {sheet.edited && <Badge variant="outline">Corrected by hand</Badge>}
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {!rows.length && <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nothing matches.</TableCell></TableRow>}
+              {!rows.length && <TableRow><TableCell colSpan={5 + counts.length} className="py-8 text-center text-muted-foreground">Nothing matches.</TableCell></TableRow>}
             </TableBody>
           </Table>
         )}
