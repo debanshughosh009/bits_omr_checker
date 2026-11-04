@@ -1,6 +1,6 @@
-# BITS OMR Checker: Custom Template to Scoring Pipeline
+# OMR Checker: Custom Template to Scoring Pipeline
 
-An automated, template-driven Optical Mark Recognition (OMR) processing and scoring pipeline designed for institutional examinations (BITS Pilani Hyderabad). The system reliably digitizes physical OMR answer sheets into verified structured data at scale.
+An automated, template-driven Optical Mark Recognition (OMR) processing and scoring pipeline designed for institutional examinations. The system reliably digitizes physical OMR answer sheets into verified structured data at scale.
 
 ---
 
@@ -61,12 +61,16 @@ omr_checker/
 │   ├── plan.md             # Master architecture roadmap (M0-M8)
 │   ├── bits_omr_README.md  # Sheet layout calibration notes
 │   └── OMRChecker_README.md
-├── designer/               # Sheet designer: prints a new OMR sheet and its template.json
-│   ├── index.html          # Open in a browser; form on the left, A4 sheet on the right
-│   ├── sheet.js            # The layout both the printout and the template come from
-│   └── app.js              # The form
+├── app/server.py           # Local server: serves the web app, stores exams in data/omr.db (SQLite)
+├── web/                    # The web app (React + shadcn/ui): dashboard, sheet designer, evaluator
+│   ├── src/lib/sheet.js    # The sheet layout both the printout and the template come from
+│   ├── src/lib/score.js    # Answer keys and marking schemes
+│   └── dist/               # The built app, committed so running needs only Python
+├── Start OMR.command/.bat  # Double-click to run (macOS / Windows)
+├── packaging/              # Mac and Windows app builds (PyInstaller spec, installer, icons)
 ├── scripts/                # Developer utilities for templates
 │   ├── check_designer.py   # Round trip: designed sheet -> filled scan -> CSV
+│   ├── check_score.mjs     # Scoring rules
 │   ├── make_template.py    # Generates template.json
 │   ├── check_template.py   # Visual alignment checker
 │   └── validate_schema.py  # Schema validator
@@ -76,6 +80,47 @@ omr_checker/
 ---
 
 ## Getting Started
+
+### The app (dashboard, designer and evaluator, one click)
+
+Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in its own window at `http://localhost:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
+
+- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the default template (`scans_to_csv/template.json`) or any other `template.json`.
+- **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
+- **Evaluating**: type an answer key per set; drop scans in and press **Read** (this runs `scans_to_csv/omr_to_csv.py`); see the score distribution and which questions few got right (often a wrong key); click a scan to see the overlay and correct a misread; **Export CSV** saves the marks.
+
+Answer keys: on a sheet's **Answer key** page, pick a set from the bar along the top, give each question a type (single correct, multiple correct, either accepted, bonus, dropped) and click its right option(s): one for single correct, any number for multiple correct or either accepted. **Type for all** switches a whole set between single and multiple correct, and **Copy from** reuses another set's key. Marking schemes:
+
+| | Options |
+|---|---|
+| Single correct | marks for correct, wrong, blank; a multi-marked answer counts as wrong or scores zero |
+| Multiple correct | **All or nothing**; **Partial** (JEE Advanced style: full for exactly right, per-option marks for a subset of right options, wrong marks if any wrong option); **Proportional** (full × share of right options marked); **Per option** (+ per right option, − per wrong option) |
+
+Marks are recalculated as you change the key or the scheme, and the scheme page shows what sample answers would score. `node scripts/check_score.mjs` checks the scoring rules.
+
+**Changing the app** (needs Node 18+): edit `web/src/`, then restart the app; it rebuilds `web/dist/` on start when the source is newer. For live reload while editing, run `python app/server.py --no-browser` alongside `cd web && npm run dev`. Commit `web/dist/` with your change so machines without Node keep working.
+
+### Mac and Windows apps
+
+Releases ship OMR Checker as an installed app, with no Python, Node or terminal needed:
+
+- **macOS:** `OMR-Checker-<version>-mac-apple-silicon.dmg` or `-mac-intel.dmg`. Open it and drag OMR Checker to Applications.
+- **Windows:** `OMR-Checker-<version>-windows-setup.exe`, a per-user installer (no admin rights) with Start menu and optional desktop shortcuts and an uninstaller.
+
+Opening the app starts it in the background and opens it in its own window, with no tabs or address bar. It uses the default browser's app mode when that is Chrome, Edge or Brave, and otherwise the first of those installed; with none of them it opens a normal browser tab. Opening it again while it runs opens another window. A few minutes after the last window closes, it stops by itself, and nothing stays in the menu bar or Dock. Its data lives in `~/Library/Application Support/OMR Checker` or `%LOCALAPPDATA%\OMR Checker`. The builds are not code-signed yet, so the first launch needs right-click → Open on macOS (or System Settings → Privacy & Security → Open Anyway), and More info → Run anyway on Windows SmartScreen.
+
+**Building one locally** (Python 3.12 recommended):
+
+```bash
+cd web && npm ci && npm run build && cd ..
+python -m venv .venv-build && .venv-build/bin/pip install -r packaging/requirements.txt
+.venv-build/bin/python packaging/build.py        # writes release/OMR-Checker-<version>-...
+.venv-build/bin/python packaging/smoke_test.py   # the packaged app must read scans like the source
+```
+
+On Windows, install [Inno Setup 6](https://jrsoftware.org/isinfo.php) first and use `.venv-build\Scripts\python`. `packaging/omr_checker.spec` is the PyInstaller spec, `packaging/windows-installer.iss` the installer, and `packaging/make_icons.py` redraws the icons.
+
+**Releasing:** set `__version__` in `app/server.py`, commit, then push a matching tag (`git tag v1.0.0 && git push origin v1.0.0`). `.github/workflows/release.yml` builds and checks all three apps and attaches them to a **draft** GitHub Release to review and publish. Running the workflow by hand from the Actions tab builds the apps without a release.
 
 ### 1. Prerequisites & Environment Setup
 
@@ -149,27 +194,17 @@ python scans_to_csv/omr_to_csv.py --help
 
 ### 3. Designing a New Sheet
 
-Start the designer from the repository root:
+Open **Design a sheet** in the app. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter, written like the campus email (`F20231187@H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year (each digit level with the same digit in the other columns), the four digits, "@" printed, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" and "@" back into `ID NO`. The grid is headed EMAIL; beside it the student writes their name and ID number on two lines, and the quiz date is printed in the header, so there are no signature or date blanks.
 
-```bash
-python -m http.server 8000 --directory designer
-```
-
-Open <http://localhost:8000> in a browser. Stop the server with `Ctrl+C`.
-There is no build step. The form on the left sets the header, instructions, set
-box, options, and number of questions; the right side is the A4 sheet as it
-will print. Questions spread over up to four columns, fewer when there are many
-options, and the form says how many questions fit. The ID grid is fixed to the
-degree (F first degree, H higher degree, P PhD), the year, the last four
-digits, and the campus letter (`F20231187H`).
+**Two sheets per page** (in the Questions card) prints two half-height sheets one above the other on an A4, with a dotted cut line and scissors between them. Bubbles stay full size, so a half holds fewer questions (25 with four options, 20 with five); the question count is capped at what fits. Each half has its own corner markers: cut the pages and scan the halves like any other sheet.
 
 - **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
-- **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
-- **Save draft** / **Open…** keep the form as a `.json` file; the browser also remembers the last draft.
+- **Template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
+- **Save draft** / **Open** keep the form as a `.json` file; the browser also remembers the last draft.
 
-The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. Sheets printed before the designer still use the hand-calibrated `scans_to_csv/template.json`.
+The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. `scans_to_csv/template.json` is the default template the command-line reader uses.
 
-`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed.
+`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed, and `--half` (optionally `--on-a4`) to test a cut-out half of a two-per-page sheet.
 
 ---
 

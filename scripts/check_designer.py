@@ -1,12 +1,13 @@
-"""Round trip for designer/: render the default sheet, fill it in, skew it like a
+"""Round trip for the sheet designer: render the default sheet, fill it in, skew it like a
 scan, read it with scans_to_csv, and check the answers come back.
 
-    python scripts/check_designer.py [--sheet ABCDE:60] [--pdf PRINTED.pdf] [--keep DIR]
+    python scripts/check_designer.py [--sheet ABCDE:60] [--half [--on-a4]] [--pdf PRINTED.pdf] [--keep DIR]
 
 --sheet sets the options and question count (default ABCD:30); a --pdf must have
-been printed with the same two settings.
+been printed with the same two settings. --half checks one cut-out half of a
+two-per-page sheet; --on-a4 scans that half lying on an A4 flatbed.
 
-Needs node (to run designer/sheet.js) and the scans_to_csv requirements."""
+Needs node (to run web/src/lib/sheet.js) and the scans_to_csv requirements."""
 import csv, json, subprocess, sys, tempfile
 from pathlib import Path
 
@@ -16,25 +17,26 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
 DPI = 200
-ID = "H20271293G"   # "20" is printed, the rest is bubbled
+ID = "H20271293@G"  # "20" and "@" are printed, the rest is bubbled
 SET = "C"
 
 DUMP = """
-const S = require(process.argv[1]);
-const L = S.layout({ ...S.defaults(), options: process.argv[2], questions: +process.argv[3] });
-process.stdout.write(JSON.stringify({ svg: S.sheetSvg(L), template: S.template(L), layout: L }));
+import(require("url").pathToFileURL(process.argv[1])).then((S) => {
+  const L = S.layout({ ...S.defaults(), options: process.argv[2], questions: +process.argv[3], twoUp: process.argv[4] === "half" });
+  process.stdout.write(JSON.stringify({ svg: S.sheetSvg(L), template: S.template(L), layout: L }));
+});
 """
 
 
 def main(work: Path, opts: str, n: int):
     answers = {q: opts[q % len(opts)] for q in range(1, n + 1) if q % 7}   # q7, q14, ... left blank
     answers[5] = opts[0] + opts[2]                                         # one multi-mark
-    out = json.loads(subprocess.run(["node", "-e", DUMP, str(ROOT / "designer/sheet.js"), opts, str(n)],
+    out = json.loads(subprocess.run(["node", "-e", DUMP, str(ROOT / "web/src/lib/sheet.js"), opts, str(n), "half" if HALF else "full"],
                                     check=True, capture_output=True, text=True).stdout)
     assert not out["layout"]["issues"], out["layout"]["issues"]
     (work / "template.json").write_text(json.dumps(out["template"], indent=2))
 
-    # --pdf: a sheet the browser printed from designer/index.html (default settings)
+    # --pdf: a sheet printed from the app's designer (default settings)
     doc = pymupdf.open(PDF) if PDF else pymupdf.open(stream=out["svg"].encode(), filetype="svg")
     pix = doc[0].get_pixmap(dpi=DPI)
     img = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w, pix.n)[:, :, :3].copy()
@@ -55,6 +57,12 @@ def main(work: Path, opts: str, n: int):
                     r = 0.46 * b.get("d", 4.2) * mm                 # a student fills most of the bubble
                     cv2.circle(img, (round(b["cx"] * mm), round(b["cy"] * mm)), round(r), (120, 40, 20), -1)
 
+    if ON_A4:  # the cut half lying in the corner of an A4 flatbed scan
+        a4 = np.full((round(297 * mm), round(210 * mm), 3), 255, np.uint8)
+        x = min(30, a4.shape[1] - img.shape[1])
+        a4[40:40 + img.shape[0], x:x + img.shape[1]] = img
+        img = a4
+
     # scan: shrink 3%, turn 1.2 degrees, shift, blur, on a page-sized canvas
     h, w = img.shape[:2]
     m = cv2.getRotationMatrix2D((w / 2, h / 2), 1.2, 0.97)
@@ -71,12 +79,14 @@ def main(work: Path, opts: str, n: int):
     expect = {"Set": SET, "ID NO": ID, **{f"q{q}": answers.get(q, "") for q in range(1, n + 1)}}
     wrong = {k: (row.get(k), v) for k, v in expect.items() if row.get(k) != v}
     assert not wrong, f"read != filled (got, want): {wrong}"
-    print(f"ok: set, ID {ID} and {n} questions x {len(opts)} options read back correctly; check={row['check']!r}")
+    kind = "half sheet" + (" on an A4 scan" if ON_A4 else "") if HALF else "sheet"
+    print(f"ok ({kind}): set, ID {ID} and {n} questions x {len(opts)} options read back correctly; check={row['check']!r}")
 
 
 if __name__ == "__main__":
     arg = lambda k: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else None
     PDF = arg("--pdf")
+    HALF, ON_A4 = "--half" in sys.argv, "--on-a4" in sys.argv
     opts, n = (arg("--sheet") or "ABCD:30").split(":")
     if arg("--keep"):
         d = Path(arg("--keep")); d.mkdir(parents=True, exist_ok=True)

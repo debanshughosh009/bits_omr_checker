@@ -1,0 +1,4 @@
+# Everything the packaged app bundles, plus the packager itself
+-r ../scans_to_csv/requirements.txt
+opencv-contrib-python
+pyinstaller>=6.10

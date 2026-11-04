@@ -29,6 +29,10 @@ DD_Quiz1_CS/
 !**/templates/*.png
 !**/templates/*.json
 !**/overlay.png
+# the app's own icons
+!packaging/*.png
+!web/public/*.png
+!web/dist/*.png
 !docs/**
 !*.md
 
@@ -69,6 +73,7 @@ __pycache__/
 .Python
 build/
 dist/
+!web/dist/
 *.egg-info/
 
 # Virtual Environments
@@ -85,8 +90,15 @@ env/
 .DS_Store
 Thumbs.db
 ehthumbs.db
+# Local app data (SQLite database, uploaded scans, overlays)
+data/
 
+# Web app dependencies (web/dist is committed, so running needs only Python)
+node_modules/
 
+# Packaged app builds (build/ is ignored above)
+release/
+.venv-build/
 template_1
 template_2
 template_3
