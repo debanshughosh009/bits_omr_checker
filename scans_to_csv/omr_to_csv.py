@@ -97,7 +97,7 @@ def build_work_dir(
         shutil.copy2(template_path, work_root / "template.json")
 
     # CropOnMarkers needs its marker image beside the template. Sheets from
-    # designer/ name one that is not saved with the template, so draw it.
+    # the designer name one that is not saved with the template, so draw it.
     for p in tpl.get("preProcessors", []):
         rel = p.get("options", {}).get("relativePath")
         if p.get("name") == "CropOnMarkers" and rel:
@@ -122,7 +122,7 @@ def build_work_dir(
 
 def write_marker(path: Path, size: int = 200) -> None:
     """Draw the designer's corner marker: black square, white at 62.5%, black at 31.25%.
-    Keep in step with MARKER_RINGS in designer/sheet.js."""
+    Keep in step with MARKER_RINGS in web/src/lib/sheet.js."""
     import cv2
     import numpy as np
 

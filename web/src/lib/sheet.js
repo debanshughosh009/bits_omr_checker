@@ -3,7 +3,7 @@
 // scripts/check_designer.py can run it under node.
 
 // ---------- fixed geometry (mm) ----------
-const PAGE = { w: 210, h: 297 };
+const A4 = { w: 210, h: 297 };
 const MARGIN = 20;                 // printed content stays this far from the page edge
 const MARKER = { size: 8, inset: 12 }; // corner markers, centred `inset` from each edge
 const BUBBLE = 4.2;                // bubble diameter
@@ -12,22 +12,29 @@ const OPT = 5.8, Q_ROW = 5.8;      // question pitch: between options, between q
 const Q_LABEL = 8;                 // room for the question number left of the first bubble
 const Q_GUTTER = 4;                // space between question columns
 const Q_COLS = 4;                  // spread questions over up to this many columns, more only when they need it
-// Spare page is spent on the questions: rows, options and bubbles grow up to these
-const Q_ROW_MAX = 12, OPT_MAX = 9, Q_BUBBLE_MAX = 6;
+// Spare page is spent on the questions: rows and bubbles grow up to these
+const Q_ROW_MAX = 12, Q_BUBBLE_MAX = 6;
+const OPT_GAP = 1.6;               // between neighbouring option bubbles, edge to edge
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 // BITS ID number as degree (F first degree, H higher degree, P PhD), year, last
-// four digits, campus (F20231187H), one string per column listing its symbols top
-// to bottom. A one-symbol column is fixed: printed in its box, not bubbled.
+// four digits, "@", campus (F20231187@H, as in the campus email), one string per
+// column listing its symbols top to bottom. A one-symbol column is fixed: printed
+// in its box, not bubbled. Digits sit on their own row, so 1 is level with 1.
 const D = "0123456789";
-const ID_COLUMNS = ["FHP", "2", "0", "1234", D, D, D, D, D, "HGPD"];
+const ID_COLUMNS = ["FHP", "2", "0", "1234", D, D, D, D, D, "@", "HGPD"];
 const PX_PER_MM = 8;               // template resolution; scans are resized to this frame
 
+// One sheet is a portrait A4, or with twoUp the top half of one: full width, so
+// bubbles keep their size, printed twice one above the other with a cut line
+// between. Each half is a whole sheet with its own markers, so a cut half reads
+// like any other scan.
+const pageOf = (s) => (s.twoUp ? { w: A4.w, h: A4.h / 2 } : A4);
 // The reader warps every scan so the marker centres become the template's corners,
 // so template coordinates are measured from the top-left marker centre.
-const FRAME = {
+const frameOf = (page) => ({
   x: MARKER.inset, y: MARKER.inset,
-  w: PAGE.w - 2 * MARKER.inset, h: PAGE.h - 2 * MARKER.inset,
-};
+  w: page.w - 2 * MARKER.inset, h: page.h - 2 * MARKER.inset,
+});
 // Concentric marker: black square, white square at 62.5%, black centre at 31.25%.
 // scans_to_csv/omr_to_csv.py draws the same pattern for the matcher; keep them equal.
 const MARKER_RINGS = [1, 0.625, 0.3125];
@@ -38,12 +45,13 @@ function defaults() {
     exam: "Quiz 1",
     course: "",
     date: "",
-    instructions: "Use a blue or black ball-point pen and fill each bubble completely.\nBubble your ID number and set. Do not make stray marks on this sheet.",
+    instructions: "Use a blue or black ball-point pen and fill each bubble completely.\nBubble your email and set. Do not make stray marks on this sheet.",
     showSet: true,
     sets: "ABCD",
-    idTitle: "ID NUMBER",
+    idTitle: "EMAIL",
     questions: 30,
     options: "ABCD",
+    twoUp: false,
   };
 }
 
@@ -59,18 +67,21 @@ const toInt = (v, lo, hi, fallback) => {
 // get the page; question columns are as many as the option count allows.
 function layout(s) {
   const issues = [];
-  const left = MARGIN, right = PAGE.w - MARGIN;
-  const out = { texts: [], lines: [], boxes: [], bubbles: [], fields: [], markers: [], idColumns: [], issues };
+  const page = pageOf(s), frame = frameOf(page);
+  const left = MARGIN, right = page.w - MARGIN;
+  const out = { page, frame, twoUp: !!s.twoUp, texts: [], lines: [], boxes: [], bubbles: [], fields: [], markers: [], idColumns: [], issues };
 
-  // header
-  out.texts.push({ x: PAGE.w / 2, y: 22, text: s.title, size: 4.6, bold: true, anchor: "middle" });
+  // header: the date is printed here, so the sheet needs no blank for it. A half
+  // sheet starts it higher, level with the top markers, to leave room for questions.
+  const up = s.twoUp ? 6 : 0;
+  out.texts.push({ x: page.w / 2, y: 22 - up, text: s.title, size: 4.6, bold: true, anchor: "middle" });
   const sub = [s.exam, s.course, s.date].map((t) => (t || "").trim()).filter(Boolean).join("   ·   ");
-  if (sub) out.texts.push({ x: PAGE.w / 2, y: 28, text: sub, size: 3.4, anchor: "middle" });
-  out.lines.push({ x1: left, y1: 32, x2: right, y2: 32, width: 0.3 });
+  if (sub) out.texts.push({ x: page.w / 2, y: 28 - up, text: sub, size: 3.4, anchor: "middle" });
+  out.lines.push({ x1: left, y1: 32 - up, x2: right, y2: 32 - up, width: 0.3 });
 
   // ID grid, right-aligned: the heading beside a write-in box over each column, bubbles below
   const idCols = ID_COLUMNS.map(chars);
-  const bandTop = 39, boxTop = bandTop - 2;
+  const bandTop = 39 - up, boxTop = bandTop - 2;
   const idX0 = right - BUBBLE / 2 - (idCols.length - 1) * ID_COL;
   const idTitleW = (s.idTitle || "").length * 3 * 0.62; // ponytail: bold caps at ~0.62 em
   let idBottom = bandTop;
@@ -78,13 +89,14 @@ function layout(s) {
     out.texts.push({ x: idX0 - ID_COL / 2 - 1.5, y: boxTop + 3.8, text: s.idTitle, size: 3, bold: true, anchor: "end" });
     idCols.forEach((symbols, i) => {
       const cx = idX0 + i * ID_COL, top = boxTop + 9.5;
-      out.boxes.push({ x: cx - ID_COL / 2 + 0.3, y: boxTop, w: ID_COL - 0.6, h: 5.5 });
+      if (symbols[0] !== "@") out.boxes.push({ x: cx - ID_COL / 2 + 0.3, y: boxTop, w: ID_COL - 0.6, h: 5.5 }); // "@" is printed bare
       if (symbols.length === 1) { // fixed: the reader puts it back into the ID (template idColumns)
         out.texts.push({ x: cx, y: boxTop + 4, text: symbols[0], size: 3.4, bold: true, anchor: "middle" });
         out.idColumns.push(symbols[0]);
         return;
       }
-      const bubbles = symbols.map((label, r) => ({ cx, cy: top + r * ID_ROW, label }));
+      const r0 = symbols.every((c) => D.includes(c)) ? D.indexOf(symbols[0]) : 0;
+      const bubbles = symbols.map((label, r) => ({ cx, cy: top + (r0 + r) * ID_ROW, label }));
       out.bubbles.push(...bubbles);
       out.fields.push({ name: `ID${i + 1}`, label: `id${i + 1}`, direction: "vertical", bubbles, gap: ID_ROW });
       out.idColumns.push(`id${i + 1}`);
@@ -105,24 +117,22 @@ function layout(s) {
     if (bubbles.at(-1).cx + BUBBLE / 2 > leftRight - idTitleW) issues.push("Too many sets to fit beside the ID grid.");
     y += 8;
   }
-  for (const line of lines(s.instructions)) {
+  // ponytail: width guessed at half an em per character; wraps a little early rather than late
+  const perLine = Math.max(10, Math.floor((leftRight - left) / (3 * 0.5)));
+  for (const line of lines(s.instructions).flatMap((l) => wrap(l, perLine))) {
     out.texts.push({ x: left, y, text: line, size: 3, muted: true });
-    // ponytail: width guessed at half an em per character; good enough to catch a collision
-    if (line.length * 3 * 0.5 > leftRight - left) issues.push(`Instruction too long for the space beside the ID grid: “${line.slice(0, 30)}…”`);
     y += 4.4;
   }
 
-  // write-ins: name, then signature and date side by side
-  const blank = (label, x0, x1) => {
-    out.texts.push({ x: x0, y, text: label, size: 3 });
-    out.lines.push({ x1: x0 + label.length * 1.5 + 2, y1: y + 0.6, x2: x1, y2: y + 0.6, width: 0.2 });
+  // write-ins: name, then the ID number in the student's own hand
+  const blank = (label) => {
+    out.texts.push({ x: left, y, text: label, size: 3 });
+    out.lines.push({ x1: left + label.length * 1.5 + 2, y1: y + 0.6, x2: leftRight, y2: y + 0.6, width: 0.2 });
   };
   y += 5;
-  const end = left + (leftRight - left) * 0.7, mid = left + (end - left) * 0.62;
-  blank("Name", left, end);
+  blank("Name");
   y += 9;
-  blank("Signature", left, mid - 4);
-  blank("Date", mid, end);
+  blank("ID Number");
   y += 3;
 
   // questions, numbered down each column, spread across the width
@@ -130,7 +140,7 @@ function layout(s) {
   const opts = chars(s.options);
   const qTop = Math.max(y, idBottom) + 9;
   out.lines.push({ x1: left, y1: qTop - 5, x2: right, y2: qTop - 5, width: 0.3 });
-  const lastRow = FRAME.y + FRAME.h - MARKER.size - BUBBLE / 2; // lowest bubble centre
+  const lastRow = frame.y + frame.h - MARKER.size - BUBBLE / 2; // lowest bubble centre
   const rowsFit = Math.max(1, Math.floor((lastRow - qTop) / Q_ROW) + 1);
   const colNeed = Q_LABEL + (opts.length - 1) * OPT + BUBBLE + Q_GUTTER;
   const colsFit = Math.max(1, Math.floor((right - left + Q_GUTTER) / colNeed));
@@ -142,16 +152,19 @@ function layout(s) {
   else if (n > rowsFit * colsFit) {
     issues.push(`${n} questions with ${opts.length} options don't fit: at most ${rowsFit * colsFit} do. Cut questions or options.`);
   }
-  // fill the page: stretch rows down to the bottom markers, then widen options and
-  // grow bubbles into the room that leaves, never letting neighbours touch
+  // fill the page: stretch rows down to the bottom markers and grow the bubbles with
+  // them; a question's options stay close together, and each question block sits in
+  // the middle of its column so the spare width goes between columns
   const row = perCol > 1 ? clamp((lastRow - qTop) / (perCol - 1), Q_ROW, Q_ROW_MAX) : Q_ROW;
   let d = clamp(row * 0.55, BUBBLE, Q_BUBBLE_MAX);
-  const opt = opts.length > 1 ? clamp((colW - Q_LABEL - Q_GUTTER - d) / (opts.length - 1), OPT, OPT_MAX) : OPT;
-  d = clamp(opt - 1.5, BUBBLE, d);
+  const room = opts.length > 1 ? (colW - Q_LABEL - Q_GUTTER - d) / (opts.length - 1) : Infinity;
+  const opt = Math.max(OPT, Math.min(d + OPT_GAP, room));
+  d = clamp(opt - OPT_GAP, BUBBLE, d);
+  const blockW = Q_LABEL + (opts.length - 1) * opt + d;
   const numSize = Math.min(3.8, 3 * d / BUBBLE);
   for (let c = 0; c * perCol < n && opts.length; c++) {
     const first = c * perCol + 1, last = Math.min(n, first + perCol - 1);
-    const x0 = left + c * colW + Q_LABEL + d / 2;
+    const x0 = left + c * colW + Math.max(0, (colW - blockW) / 2) + Q_LABEL + d / 2;
     const bubbles = [];
     for (let q = first; q <= last; q++) {
       const cy = qTop + (q - first) * row;
@@ -166,7 +179,7 @@ function layout(s) {
   }
 
   for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-    out.markers.push({ cx: FRAME.x + sx * FRAME.w, cy: FRAME.y + sy * FRAME.h });
+    out.markers.push({ cx: frame.x + sx * frame.w, cy: frame.y + sy * frame.h });
   }
   return out;
 }
@@ -176,7 +189,18 @@ function esc(t) {
   return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 }
 
-function sheetSvg(L) {
+// Words of one instruction line, packed into lines of at most n characters
+function wrap(line, n) {
+  const out = [];
+  for (const word of line.split(/\s+/)) {
+    if (out.length && (out.at(-1) + " " + word).length <= n) out[out.length - 1] += " " + word;
+    else out.push(word);
+  }
+  return out;
+}
+
+// One sheet's drawing, in its own mm coordinates
+function sheetBody(L) {
   const parts = [];
   for (const m of L.markers) {
     MARKER_RINGS.forEach((k, i) => {
@@ -194,9 +218,26 @@ function sheetSvg(L) {
   for (const t of L.texts) {
     parts.push(`<text x="${t.x}" y="${t.y}" font-size="${t.size}"${t.bold ? ' font-weight="bold"' : ""}${t.anchor ? ` text-anchor="${t.anchor}"` : ""} fill="${t.muted ? "#444" : "#000"}">${esc(t.text)}</text>`);
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="sheet" width="${PAGE.w}mm" height="${PAGE.h}mm" viewBox="0 0 ${PAGE.w} ${PAGE.h}" font-family="Helvetica, Arial, sans-serif">
-<rect width="${PAGE.w}" height="${PAGE.h}" fill="#fff"/>
-${parts.join("\n")}
+  return parts.join("\n");
+}
+
+const svgOpen = (w, h) => `<svg xmlns="http://www.w3.org/2000/svg" class="sheet" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}" font-family="Helvetica, Arial, sans-serif">
+<rect width="${w}" height="${h}" fill="#fff"/>`;
+
+// One sheet on its own page: what a scan of it (cut out, if twoUp) looks like
+function sheetSvg(L) {
+  return `${svgOpen(L.page.w, L.page.h)}\n${sheetBody(L)}\n</svg>`;
+}
+
+// The page as printed: one sheet, or two one above the other with a dashed cut line
+function printSvg(L) {
+  if (!L.twoUp) return sheetSvg(L);
+  const { w, h } = L.page, body = sheetBody(L);
+  return `${svgOpen(w, 2 * h)}
+<g>${body}</g>
+<g transform="translate(0 ${h})">${body}</g>
+<line x1="9" y1="${h}" x2="${w - 3}" y2="${h}" stroke="#666" stroke-width="0.3" stroke-dasharray="2 1.5"/>
+<text x="3" y="${h + 1.7}" font-size="5" fill="#444">✂</text>
 </svg>`;
 }
 
@@ -205,7 +246,8 @@ function template(L) {
   const px = (mm) => Math.round(mm * PX_PER_MM * 100) / 100;
   const size = (d) => Math.round(d * PX_PER_MM);
   const box = size(BUBBLE);
-  const origin = (b, w) => [Math.round((b.cx - FRAME.x) * PX_PER_MM - w / 2), Math.round((b.cy - FRAME.y) * PX_PER_MM - w / 2)];
+  const F = L.frame;
+  const origin = (b, w) => [Math.round((b.cx - F.x) * PX_PER_MM - w / 2), Math.round((b.cy - F.y) * PX_PER_MM - w / 2)];
   const fieldBlocks = {};
   for (const f of L.fields) {
     const w = f.d ? size(f.d) : box;
@@ -225,13 +267,13 @@ function template(L) {
     return Array.from({ length: b - a + 1 }, (_, i) => `q${a + i}`);
   });
   return {
-    pageDimensions: [px(FRAME.w), px(FRAME.h)].map(Math.round),
+    pageDimensions: [px(F.w), px(F.h)].map(Math.round),
     bubbleDimensions: [box, box],
     preProcessors: [{
       name: "CropOnMarkers",
       options: {
         relativePath: "omr_marker.png",
-        sheetToMarkerWidthRatio: PAGE.w / MARKER.size,
+        sheetToMarkerWidthRatio: L.page.w / MARKER.size,
         marker_rescale_range: [70, 130],
         marker_rescale_steps: 12,
       },
@@ -248,4 +290,4 @@ function template(L) {
   };
 }
 
-if (typeof module !== "undefined") module.exports = { defaults, layout, sheetSvg, template };
+export { defaults, layout, sheetSvg, printSvg, template, chars };
