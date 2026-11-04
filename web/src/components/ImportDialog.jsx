@@ -1,4 +1,4 @@
-// Evaluate a sheet that wasn't designed here: the original 30-question sheet or any template.json
+// Evaluate a sheet that wasn't designed here: the default template (scans_to_csv/template.json) or any template.json
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { api, go, useExams } from "@/lib/api";
+import { sheetInfo } from "@/lib/score";
 
 export default function ImportDialog({ open, onClose }) {
   const { reload } = useExams();
@@ -15,6 +16,11 @@ export default function ImportDialog({ open, onClose }) {
   const [choice, setChoice] = useState("original");
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [defaultInfo, setDefaultInfo] = useState(null); // what the default template holds, for its description
+
+  useEffect(() => {
+    fetch("/scans_to_csv/template.json").then((r) => r.json()).then((t) => setDefaultInfo(sheetInfo(t)), () => {});
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -31,7 +37,7 @@ export default function ImportDialog({ open, onClose }) {
       if (choice === "original") tpl = await (await fetch("/scans_to_csv/template.json")).json();
       else if (!file) throw new Error("choose a template.json");
       else tpl = JSON.parse(await file.text());
-      const fallback = choice === "original" ? "30-question sheet" : file.name.replace(/(_template)?\.json$/i, "");
+      const fallback = choice === "original" ? "Default sheet" : file.name.replace(/(_template)?\.json$/i, "");
       const { id } = await api("exams", { method: "POST", body: { name: name.trim() || fallback, template: tpl } });
       await reload();
       onClose();
@@ -45,7 +51,10 @@ export default function ImportDialog({ open, onClose }) {
   }
 
   const options = [
-    { value: "original", label: "The original 30-question sheet", hint: "The hand-calibrated sheet printed before the designer" },
+    {
+      value: "original", label: "The default template",
+      hint: `scans_to_csv/template.json${defaultInfo ? ` · ${defaultInfo.questions.length} questions, options ${defaultInfo.options.join("")}` : ""}`,
+    },
     { value: "file", label: "A template.json", hint: "Downloaded from the designer or written by hand" },
   ];
 

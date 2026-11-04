@@ -85,7 +85,7 @@ omr_checker/
 
 Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in its own window at `http://localhost:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
 
-- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the original 30-question sheet or any `template.json`.
+- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the default template (`scans_to_csv/template.json`) or any other `template.json`.
 - **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
 - **Evaluating**: type an answer key per set; drop scans in and press **Read** (this runs `scans_to_csv/omr_to_csv.py`); see the score distribution and which questions few got right (often a wrong key); click a scan to see the overlay and correct a misread; **Export CSV** saves the marks.
 
@@ -202,7 +202,7 @@ Open **Design a sheet** in the app. The form on the left sets the header, instru
 - **Template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
 - **Save draft** / **Open** keep the form as a `.json` file; the browser also remembers the last draft.
 
-The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. Sheets printed before the designer still use the hand-calibrated `scans_to_csv/template.json`.
+The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. `scans_to_csv/template.json` is the default template the command-line reader uses.
 
 `python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed, and `--half` (optionally `--on-a4`) to test a cut-out half of a two-per-page sheet.
 
