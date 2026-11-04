@@ -55,6 +55,7 @@ omr_checker/
 │   ├── src/lib/score.js    # Answer keys and marking schemes
 │   └── dist/               # The built app, committed so running needs only Python
 ├── Start OMR.command/.bat  # Double-click to run (macOS / Windows)
+├── packaging/              # Mac and Windows app builds (PyInstaller spec, installer, icons)
 ├── scripts/                # Developer utilities for templates
 │   ├── check_designer.py   # Round trip: designed sheet -> filled scan -> CSV
 │   ├── check_score.mjs     # Scoring rules
@@ -86,6 +87,28 @@ Answer keys: on a sheet's **Answer key** page, pick a set from the bar along the
 Marks are recalculated as you change the key or the scheme, and the scheme page shows what sample answers would score. `node scripts/check_score.mjs` checks the scoring rules.
 
 **Changing the app** (needs Node 18+): edit `web/src/`, then restart the app; it rebuilds `web/dist/` on start when the source is newer. For live reload while editing, run `python app/server.py --no-browser` alongside `cd web && npm run dev`. Commit `web/dist/` with your change so machines without Node keep working.
+
+### Mac and Windows apps
+
+Releases ship OMR Checker as an installed app, with no Python, Node or terminal needed:
+
+- **macOS:** `OMR-Checker-<version>-mac-arm64.dmg` (Apple Silicon) or `-mac-x64.dmg` (Intel). Open it and drag OMR Checker to Applications.
+- **Windows:** `OMR-Checker-<version>-windows-setup.exe`, a per-user installer (no admin rights) with Start menu and optional desktop shortcuts and an uninstaller.
+
+The app runs from the menu bar (macOS) or notification area (Windows), with **Open OMR Checker** and **Quit**, and opens in the default browser. Its data lives in `~/Library/Application Support/OMR Checker` or `%LOCALAPPDATA%\OMR Checker`. The builds are not code-signed yet, so the first launch needs right-click → Open on macOS (or System Settings → Privacy & Security → Open Anyway), and More info → Run anyway on Windows SmartScreen.
+
+**Building one locally** (Python 3.12 recommended):
+
+```bash
+cd web && npm ci && npm run build && cd ..
+python -m venv .venv-build && .venv-build/bin/pip install -r packaging/requirements.txt
+.venv-build/bin/python packaging/build.py        # writes release/OMR-Checker-<version>-...
+.venv-build/bin/python packaging/smoke_test.py   # the packaged app must read scans like the source
+```
+
+On Windows, install [Inno Setup 6](https://jrsoftware.org/isinfo.php) first and use `.venv-build\Scripts\python`. `packaging/omr_checker.spec` is the PyInstaller spec, `packaging/windows-installer.iss` the installer, and `packaging/make_icons.py` redraws the icons.
+
+**Releasing:** set `__version__` in `app/server.py`, commit, then push a matching tag (`git tag v1.0.0 && git push origin v1.0.0`). `.github/workflows/release.yml` builds and checks all three apps and attaches them to a **draft** GitHub Release to review and publish. Running the workflow by hand from the Actions tab builds the apps without a release.
 
 ### 1. Prerequisites & Environment Setup
 
