@@ -1,15 +1,14 @@
 // Answer keys, one set at a time: each question gets a type, then its right
 // option(s) picked like bubbles: one for single correct, any number for multiple.
-// Keys are still stored as text (see score.js), so a pasted key works too.
+// Keys are stored as text (see score.js).
 import { useState } from "react";
-import { ClipboardPaste, Copy, Eraser, ListChecks, TriangleAlert } from "lucide-react";
+import { Copy, Eraser, ListChecks, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { keyToText, parseKey } from "@/lib/score";
+import { keyToText } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 const TYPES = {
@@ -34,14 +33,19 @@ function answerFor(type, opts) {
 export default function AnswerKey({ info, keyTexts, setKeyTexts, parsed }) {
   const sets = info.sets.length ? info.sets : [""];
   const [set, setSet] = useState(sets[0]);
-  const [types, setTypes] = useState({}); // "set:index" -> type, for questions with nothing picked yet
+  const [types, setTypes] = useState({}); // "set:index" -> the type chosen for that question
   const [fallback, setFallback] = useState({}); // set -> type for questions with nothing picked yet
-  const [pasting, setPasting] = useState(null);
   const answers = parsed[set].answers;
   const order = (o) => [...o].sort((a, b) => info.options.indexOf(a) - info.options.indexOf(b));
 
   const write = (s, next) => setKeyTexts((t) => ({ ...t, [s]: keyToText(next) }));
-  const rowType = (i) => typeOf(answers[i]) ?? types[`${set}:${i}`] ?? fallback[set] ?? "single";
+  // The type chosen for a question, as long as its answer still fits it: one option picked
+  // under "either accepted" is stored like single correct, and must stay "either accepted"
+  const rowType = (i) => {
+    const chosen = types[`${set}:${i}`], a = answers[i];
+    if (chosen && (!a || typeOf(a) === chosen || (chosen === "any" && a.kind === "single"))) return chosen;
+    return typeOf(a) ?? fallback[set] ?? "single";
+  };
 
   function change(i, type, opts) {
     const next = [...answers];
@@ -101,7 +105,6 @@ export default function AnswerKey({ info, keyTexts, setKeyTexts, parsed }) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button variant="outline" size="sm" onClick={() => setPasting(keyTexts[set] || "")}><ClipboardPaste />Paste</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Clear" disabled={!given(set)}><Eraser /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -119,60 +122,50 @@ export default function AnswerKey({ info, keyTexts, setKeyTexts, parsed }) {
             {issues.map((t) => <li key={t} className="flex gap-2"><TriangleAlert className="mt-0.5 size-4 shrink-0" />{t}</li>)}
           </ul>
         )}
-        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr))]">
-          {info.questions.map((q, i) => {
-            const type = rowType(i);
-            const a = answers[i];
-            const opts = picked(a);
-            return (
-              <div key={q} className={cn("flex items-center gap-3 rounded-lg border bg-card px-3 py-2", !a && "border-dashed bg-transparent")}>
-                <span className="w-7 shrink-0 text-right font-semibold tabular-nums">{i + 1}</span>
-                <Select value={type} onValueChange={(t) => change(i, t, opts)}>
-                  <SelectTrigger size="sm" className="w-36 shrink-0 text-xs" aria-label={`Question ${i + 1} type`}><SelectValue /></SelectTrigger>
-                  <SelectContent>{Object.entries(TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                </Select>
-                {type === "bonus" || type === "dropped" ? (
-                  <span className="text-xs text-muted-foreground">{type === "bonus" ? "Full marks to everyone" : "No marks, left out of the total"}</span>
-                ) : type === "single" ? (
-                  <ToggleGroup variant="outline" type="single" value={opts[0] ?? ""} onValueChange={(v) => change(i, type, v ? [v] : [])} aria-label={`Question ${i + 1} answer`}>
-                    {info.options.map((o) => <Bubble key={o} o={o} />)}
-                  </ToggleGroup>
-                ) : (
-                  <ToggleGroup variant="outline" type="multiple" value={opts} onValueChange={(v) => change(i, type, v)} aria-label={`Question ${i + 1} answers`}>
-                    {info.options.map((o) => <Bubble key={o} o={o} square />)}
-                  </ToggleGroup>
-                )}
-              </div>
-            );
-          })}
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16 text-right">Question</TableHead>
+                <TableHead className="w-48">Type</TableHead>
+                <TableHead>Answer</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {info.questions.map((q, i) => {
+                const type = rowType(i);
+                const a = answers[i];
+                const opts = picked(a);
+                return (
+                  <TableRow key={q} className={cn(!a && "bg-muted/30")}>
+                    <TableCell className="text-right font-semibold tabular-nums">{i + 1}</TableCell>
+                    <TableCell>
+                      <Select value={type} onValueChange={(t) => change(i, t, opts)}>
+                        <SelectTrigger size="sm" className="w-44 text-xs" aria-label={`Question ${i + 1} type`}><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.entries(TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      {type === "bonus" || type === "dropped" ? (
+                        <span className="text-xs text-muted-foreground">{type === "bonus" ? "Full marks to everyone" : "No marks, left out of the total"}</span>
+                      ) : type === "single" ? (
+                        <ToggleGroup variant="outline" type="single" value={opts[0] ?? ""} onValueChange={(v) => change(i, type, v ? [v] : [])} aria-label={`Question ${i + 1} answer`}>
+                          {info.options.map((o) => <Bubble key={o} o={o} />)}
+                        </ToggleGroup>
+                      ) : (
+                        <ToggleGroup variant="outline" type="multiple" value={opts} onValueChange={(v) => change(i, type, v)} aria-label={`Question ${i + 1} answers`}>
+                          {info.options.map((o) => <Bubble key={o} o={o} square />)}
+                        </ToggleGroup>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Round bubbles take one answer; square ones take any number. “Either accepted” gives full marks for any one of the picked options.
-        </p>
       </div>
 
-      <Dialog open={pasting !== null} onOpenChange={(o) => !o && setPasting(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Paste {set ? `set ${set}'s` : "the"} key</DialogTitle>
-            <DialogDescription>
-              One answer per question, in order or numbered (<code>12 AC</code>), separated by spaces, commas or new lines; a spreadsheet column works.
-              <code> B</code> single, <code>AC</code> or <code>A+</code> multiple, <code>A/C</code> either, <code>*</code> bonus, <code>-</code> dropped.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea value={pasting ?? ""} onChange={(e) => setPasting(e.target.value)} rows={8} className="font-mono" autoFocus placeholder="B C AC D A/C * - …" />
-          {pasting && (() => {
-            const k = parseKey(pasting, info);
-            return <p className={cn("text-sm", k.issues.some((t) => !/no answer/.test(t)) ? "text-destructive" : "text-muted-foreground")}>
-              {k.answers.filter(Boolean).length} of {info.questions.length} answers read{k.issues.length ? ` · ${k.issues.join(" · ")}` : ""}
-            </p>;
-          })()}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPasting(null)}>Cancel</Button>
-            <Button onClick={() => { write(set, parseKey(pasting, info).answers); setPasting(null); }}>Use this key</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
