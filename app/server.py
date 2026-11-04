@@ -1,7 +1,7 @@
 """
 server.py - OMR Checker: dashboard, designer and evaluator in one browser window
 ===================================================================================
-Serves the built web app (web/dist) on http://127.0.0.1:8765 and keeps exams,
+Serves the built web app (web/dist) on http://localhost:8765 and keeps exams,
 answer keys and read sheets in data/omr.db (SQLite), with each exam's scans and
 overlay images under data/exams/<id>/. Nothing leaves this machine.
 
@@ -12,9 +12,11 @@ browser (web/src/lib/score.js) so rule changes rescore instantly.
 
 The first run creates .venv/ and installs scans_to_csv's requirements into it.
 
-Packaged by PyInstaller (packaging/), it runs as a menu bar / tray app instead:
-the app's files are read from the bundle, data lives in the user's app-data
-folder, and the reader runs as this same executable with --reader.
+Packaged by PyInstaller (packaging/), opening the app starts this server in the
+background and opens the app in its own window; the server stops a few minutes
+after the last window closes. The app's files are read from the bundle, data lives
+in the user's app-data folder, and the reader runs as this same executable with
+--reader.
 """
 
 import csv
@@ -26,6 +28,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -54,7 +57,7 @@ REQUIREMENTS = STAGE / "requirements.txt"
 PORT = 8765  # fixed so the designer's saved draft (browser storage is per address) is found again
 if "--port" in sys.argv:  # for testing a second copy beside a running one
     PORT = int(sys.argv[sys.argv.index("--port") + 1])
-URL = f"http://127.0.0.1:{PORT}/"
+URL = f"http://localhost:{PORT}/"
 WEB = RES / "web" / "dist"  # built by `npm run build` in web/, committed so only Python is needed
 SCAN_EXTS = {".png", ".jpg", ".jpeg", ".pdf"}
 
@@ -219,6 +222,10 @@ def read_scans(exam_id: int, template: dict):
 # ---------- HTTP ----------
 
 class Handler(SimpleHTTPRequestHandler):
+    # fixed types for the app's files: Windows' registry can map .js to text/plain, which browsers refuse to run
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".css": "text/css",
+                      ".svg": "image/svg+xml", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json"}
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(WEB), **kw)
 
@@ -231,6 +238,11 @@ class Handler(SimpleHTTPRequestHandler):
             f = (DATA / p[len("/data/"):]).resolve()
             return str(f) if f.is_relative_to((DATA / "exams").resolve()) else str(WEB / "missing")
         return super().translate_path(path)
+
+    def parse_request(self):
+        global LAST_SEEN
+        LAST_SEEN = time.monotonic()  # any request means a window is still open
+        return super().parse_request()
 
     def log_message(self, *a):  # keep the console for errors
         pass
@@ -258,6 +270,8 @@ class Handler(SimpleHTTPRequestHandler):
         return True
 
     def api(self, method, p, q):
+        if p == ["ping"]:  # an open window saying it is still there
+            return self.send_json({"ok": True})
         if p == ["version"] and method == "GET":
             return self.send_json({"version": __version__})
         if p == ["exams"] and method == "GET":
@@ -342,32 +356,96 @@ class Handler(SimpleHTTPRequestHandler):
         self.route("DELETE") or self.send_error(405)
 
 
-def run_tray(server):
-    """Serve in the background behind a menu bar (macOS) / notification area (Windows) icon."""
-    import pystray
-    from PIL import Image
+# ---------- opening the app: its own window, and a server that stops when it closes ----------
 
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-
-    def quit_app(icon):
-        server.shutdown()
-        icon.stop()
-
-    pystray.Icon("OMR Checker", Image.open(RES / "packaging" / "tray.png"), f"OMR Checker {__version__}", menu=pystray.Menu(
-        pystray.MenuItem("Open OMR Checker", lambda: webbrowser.open(URL), default=True),
-        pystray.MenuItem(f"Version {__version__}", None, enabled=False),
-        pystray.MenuItem("Quit", quit_app),
-    )).run()
+IDLE_EXIT = 180  # seconds without a request from an open window before a background server stops
+LAST_SEEN = time.monotonic()  # the open page pings /api/ping every 20 s; browsers slow timers in hidden windows
 
 
-def main():
-    if sys.argv[1:2] == ["--reader"]:  # the packaged app reading a batch for itself (see read_scans)
-        sys.path.insert(0, str(STAGE))
-        import omr_to_csv
-        sys.argv = ["omr_to_csv", *sys.argv[2:]]
-        return omr_to_csv.main()
-    bootstrap()
-    build_web()
+def chromium_browsers() -> list[str]:
+    """Chromium-based browsers that can open a page as an app window, the default browser first."""
+    if sys.platform == "darwin":
+        known = {"com.google.chrome": "Google Chrome", "com.microsoft.edgemac": "Microsoft Edge",
+                 "com.brave.browser": "Brave Browser", "org.chromium.chromium": "Chromium"}
+        default = None
+        try:  # the https handler LaunchServices records for this user
+            import plistlib
+            prefs = Path.home() / "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+            handlers = plistlib.loads(prefs.read_bytes()).get("LSHandlers", [])
+            default = next((h.get("LSHandlerRoleAll") for h in handlers if h.get("LSHandlerURLScheme") == "https"), None)
+        except (OSError, ValueError):
+            pass
+        names = ([known[default]] if default in known else []) + list(known.values())
+        return [f"{d}/{n}.app/Contents/MacOS/{n}" for n in names for d in ("/Applications", str(Path.home() / "Applications"))]
+    if os.name == "nt":
+        known = {"ChromeHTML": r"Google\Chrome\Application\chrome.exe", "MSEdgeHTM": r"Microsoft\Edge\Application\msedge.exe",
+                 "BraveHTML": r"BraveSoftware\Brave-Browser\Application\brave.exe"}
+        default = None
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice") as k:
+                default = winreg.QueryValueEx(k, "ProgId")[0]
+        except OSError:
+            pass
+        rels = ([known[default]] if default in known else []) + list(known.values())
+        bases = [os.environ.get(v) for v in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")]
+        return [str(Path(b) / r) for r in rels for b in bases if b]
+    return [x for x in map(shutil.which, ("google-chrome", "microsoft-edge", "brave-browser", "chromium")) if x]
+
+
+def open_window():
+    """Open the app in its own window (a Chromium browser's app mode: no tabs or address bar),
+    or in a browser tab when no Chromium browser is installed."""
+    for exe in chromium_browsers():
+        if Path(exe).is_file():
+            try:
+                subprocess.Popen([exe, f"--app={URL}", "--window-size=1440,900"], **detached())
+                return
+            except OSError:
+                continue
+    webbrowser.open(URL)
+
+
+def detached() -> dict:
+    """Popen options for a process that outlives this one and shows no console."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
+                "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    return {"start_new_session": True, "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+
+
+def running() -> bool:
+    try:
+        urlopen(f"http://127.0.0.1:{PORT}/api/exams", timeout=2)
+        return True
+    except OSError:
+        return False
+
+
+def alert(message: str):
+    """Tell the user something went wrong; the packaged app has no console to print to."""
+    print(message, file=sys.stderr, flush=True)
+    if sys.platform == "darwin":
+        subprocess.run(["osascript", "-e", f'display alert "OMR Checker" message {json.dumps(message)} as critical'], check=False)
+    elif os.name == "nt":
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, message, "OMR Checker", 0x10)
+
+
+def launch():
+    """What opening the packaged app does: start the server in the background if it isn't
+    running, open a window, and exit. The server stops on its own once no window is open."""
+    if not running():
+        subprocess.Popen([sys.executable, "--serve", *sys.argv[1:]], **detached())
+        deadline = time.monotonic() + 60
+        while not running():
+            if time.monotonic() > deadline:
+                return alert(f"OMR Checker could not start. Another program may be using port {PORT}; close it and try again.")
+            time.sleep(0.3)
+    open_window()
+
+
+def serve(idle_exit: bool):
     DATA.mkdir(parents=True, exist_ok=True)
     with db() as con:
         con.executescript(SCHEMA)
@@ -376,23 +454,41 @@ def main():
     try:
         server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError:  # already running (another double-click): just open it
-        try:
-            urlopen(f"http://127.0.0.1:{PORT}/api/exams", timeout=2)
-        except OSError:
-            sys.exit(f"Port {PORT} is taken by another program; close it and try again.")
+        if not running():
+            return alert(f"Port {PORT} is taken by another program; close it and try again.")
         print(f"Already running at {URL}", flush=True)
         if "--no-browser" not in sys.argv:
-            webbrowser.open(URL)
+            open_window()
         return
-    if "--no-browser" not in sys.argv:
-        webbrowser.open(URL)
-    if FROZEN or "--tray" in sys.argv:
-        return run_tray(server)
-    print(f"OMR Checker running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
+    if idle_exit:
+        def stop_when_idle():
+            while time.monotonic() - LAST_SEEN < IDLE_EXIT:
+                time.sleep(10)
+            server.shutdown()
+        threading.Thread(target=stop_when_idle, daemon=True).start()
+    else:
+        print(f"OMR Checker running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
+        if "--no-browser" not in sys.argv:
+            open_window()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+
+
+def main():
+    if sys.argv[1:2] == ["--reader"]:  # the packaged app reading a batch for itself (see read_scans)
+        sys.path.insert(0, str(STAGE))
+        import omr_to_csv
+        sys.argv = ["omr_to_csv", *sys.argv[2:]]
+        return omr_to_csv.main()
+    if sys.argv[1:2] == ["--serve"]:  # the packaged app's background server, started by launch()
+        return serve(idle_exit=True)
+    if FROZEN:
+        return launch()
+    bootstrap()  # from the repo: run in the foreground, in the terminal that started it
+    build_web()
+    serve(idle_exit=False)
 
 
 if __name__ == "__main__":
