@@ -37,7 +37,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import urlopen
 
-__version__ = "1.0.0"  # the release version; packaging/ and the release workflow read it from here
+__version__ = "1.0.1"  # the release version; packaging/ and the release workflow read it from here
 
 
 def user_data_dir() -> Path:
