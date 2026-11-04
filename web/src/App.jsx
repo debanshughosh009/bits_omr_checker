@@ -40,6 +40,10 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [crumb, setCrumb] = useState(null);
   const [actions, setActions] = useState(null);
+  const [version, setVersion] = useState(null);
+  useEffect(() => {
+    fetch('/api/version').then((r) => r.json()).then((v) => setVersion(v.version), () => {});
+  }, []);
 
   return (
     <ExamsContext.Provider
@@ -84,7 +88,7 @@ export default function App() {
             <Dashboard />
           )}
           <footer className='mt-auto border-t px-4 py-3 text-center text-xs text-muted-foreground print:hidden'>
-            Developed by Debanshu Ghosh and Aravind Sathesh
+            Developed by Debanshu Ghosh and Aravind Sathesh{version && ` · v${version}`}
           </footer>
         </div>
         <ImportDialog open={importing} onClose={() => setImporting(false)} />

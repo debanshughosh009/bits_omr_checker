@@ -30,7 +30,7 @@ export function saveDraft(state) {
 }
 
 // The name a new sheet is saved under: course and exam, then the date
-export const draftName = (s) => [[s.course, s.exam].filter(Boolean).join(" "), s.date].map((t) => (t || "").trim()).filter(Boolean).join(" · ");
+export const draftName = (s) => [[s.course, s.exam].filter(Boolean).join(" "), s.date].map((t) => (t || "").trim()).filter(Boolean).join(" - ");
 
 // template.json for the current draft, or an error naming what to fix
 export function draftTemplate(state = loadDraft()) {
