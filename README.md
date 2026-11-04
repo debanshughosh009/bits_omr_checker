@@ -20,14 +20,17 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 ```
 
 ### Key Architectural Stages
-1. **Scans to CSV ([`scans_to_csv/`](file:///c:/Acads/omr_checker/scans_to_csv/)):**
+1. **Scans to CSV ([`scans_to_csv/`](scans_to_csv/)):**
    - **Stage 1 CLI Engine:** Processes batches of scanned JPG, PNG, and PDF sheets.
    - Self-contained pipeline: includes its own detection engine (`src/`), `template.json`, and `config.json`.
    - Detects corner alignment markers, corrects skew, samples bubble fills, decodes alphanumeric IDs and sets, and writes clean CSV data.
    - Performs built-in anomaly detection (`MULTI` options, incomplete `ID_LEN`, missing `NO_SET`).
-2. **Template Utilities ([`scripts/`](file:///c:/Acads/omr_checker/scripts/)):**
+2. **Scoring ([`scoring/`](scoring/)):**
+   - **Stage 2 Engine & UI:** Reads `output/results.csv` and answer keys, applies marking schemes and multi-mark policies, and exports `output/score.csv`.
+   - Built with Python standard library only; works fully offline with an integrated local web UI and headless CLI.
+3. **Template Utilities ([`scripts/`](scripts/)):**
    - Developer tools to generate and validate OMR layout templates (`make_template.py`, `validate_schema.py`, `check_template.py`).
-3. **Architecture & Documentation ([`docs/`](file:///c:/Acads/omr_checker/docs/)):**
+3. **Architecture & Documentation ([`docs/`](docs/)):**
    - Multi-milestone architecture plan (`plan.md`) for future scoring, roster validation, and OMR designer phases.
 
 ---
@@ -38,6 +41,15 @@ The project provides an end-to-end pipeline spanning from custom OMR sheet desig
 omr_checker/
 ├── input/                  # Scan drop folder (JPG, PNG, PDF) [tracked via .gitkeep]
 ├── output/                 # Results directory (results.csv, overlays) [tracked via .gitkeep]
+├── scoring/                # Stage 2: results.csv + keys -> score.csv
+│   ├── scorer.py           # Pure scoring functions
+│   ├── io_utils.py         # File I/O, validation, atomic write
+│   ├── cli.py              # Headless CLI
+│   ├── app.py              # Offline web UI server (127.0.0.1)
+│   ├── static/index.html   # Web UI single-page interface
+│   ├── keys/               # Answer-key JSON store (.gitkeep)
+│   ├── tests/              # Test suite
+│   └── README.md           # Stage 2 documentation
 ├── scans_to_csv/           # Stage 1: Standalone scan-to-CSV CLI pipeline
 │   ├── omr_to_csv.py       # Main CLI script
 │   ├── template.json       # Sheet layout definition
@@ -112,19 +124,36 @@ On Windows, install [Inno Setup 6](https://jrsoftware.org/isinfo.php) first and 
 
 ### 1. Prerequisites & Environment Setup
 
-Python 3.10+ is recommended. Install required packages:
+Python 3.10+ is recommended. From the repository root, create and activate a
+virtual environment, then install the scan-reader dependencies:
 
-```bash
-pip install -r scans_to_csv/requirements.txt
-pip install opencv-contrib-python
+**Windows PowerShell**
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r scans_to_csv\requirements.txt
+python -m pip install opencv-contrib-python
 ```
+
+**macOS/Linux**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r scans_to_csv/requirements.txt
+python -m pip install opencv-contrib-python
+```
+
+The designer and scorer use browser/Python standard-library functionality and
+do not require additional packages. Activate `.venv` in each new terminal.
 
 ---
 
 ### 2. Running `scans_to_csv`
 
 #### Default Run (Zero Arguments)
-By default, the script automatically reads all scans in [`input/`](file:///c:/Acads/omr_checker/input/) and outputs to [`output/results.csv`](file:///c:/Acads/omr_checker/output/results.csv):
+By default, the script automatically reads all scans in [`input/`](input/) and outputs to [`output/results.csv`](output/results.csv):
 
 ```bash
 python scans_to_csv/omr_to_csv.py
@@ -179,9 +208,53 @@ The template is computed from the same layout that draws the sheet, so there is 
 
 ---
 
+### 4. Scoring (Stage 2)
+
+The scoring stage reads `output/results.csv` plus answer keys and writes `output/score.csv` alongside a run sidecar `output/score_run.json`.
+
+#### Local Web UI (Offline)
+Launch the local browser interface on `127.0.0.1:8765`:
+```bash
+python scoring/app.py
+```
+- Fully offline: standard library only, rejects non-localhost connections.
+- Step 1: Summary of `results.csv` (row count, sets found, question count, anomalies).
+- Step 2: Marking scheme (+4/-1/0, +1/0/0, +3/-1/0, +2/-0.5/0, custom) and multi-mark policy selection.
+- Step 3: Interactive key grid and text paste (`BC-DA...`, where `-` or space denotes uncounted questions).
+- Step 4: Save/load keys, preview first 20 rows with summary stats (mean, min, max, flagged count), and atomic write to `output/score.csv`.
+
+The scorer expects `output/results.csv` from Stage 1. Open the displayed
+`http://127.0.0.1:8765/` address, load or enter an answer key, and save the
+scores. Use `Ctrl+C` to stop the server.
+
+#### Headless CLI
+```bash
+python scoring/cli.py \
+  --results output/results.csv \
+  --keys scoring/keys/quiz1.json \
+  --out output/score.csv \
+  --scheme 4,-1,0 \
+  --multi zero \
+  --per-question
+```
+
+#### Blank Key Rule
+A blank key entry (`""`) means that question is **NOT counted** for that set. It contributes 0 marks to all students and is excluded from `max_score`. A student's answer on it is completely ignored.
+
+#### Multi-Mark Policies
+When a student bubbles two or more options on a question:
+- `zero` (default): Treated as unattempted (`marks_unattempted`).
+- `wrong`: Treated as wrong (`marks_wrong`).
+- `credit_if_contains`: Marked correct if the key letter is inside the marked options; otherwise wrong.
+- `hold`: Question receives 0 marks and sheet is flagged `REVIEW` for human inspection; question is still counted in `max_score`.
+
+#### Output Files
+- `output/score.csv`: Columns `file_id`, `Set`, `ID NO`, `score`, `max_score`, `correct`, `wrong`, `unattempted`, `multi`, `counted`, `score_status`, `check` (plus optional `q1_mark`..`qN_mark`). Written atomically with automatic backups of prior runs (`score_<timestamp>.csv.bak`).
+- `output/score_run.json`: Sidecar recording timestamp, key file path, SHA-256 hash of the key file, scheme, policy, and row counts.
+
 ## Output Format & Quality Checks
 
-[`output/results.csv`](file:///c:/Acads/omr_checker/output/results.csv) contains one row per evaluated sheet:
+[`output/results.csv`](output/results.csv) contains one row per evaluated sheet:
 
 ```csv
 "file_id","Set","ID NO","q1","q2",...,"q30","check"

@@ -4,7 +4,12 @@ Reads scanned OMR answer sheets that follow a predefined template and writes the
 
 Built for the BITS Pilani, Hyderabad Campus 30-question sheet (Set A-D, 13-column student ID, Q1-Q30, options A-D), but the layout lives entirely in a JSON template, so other sheets only need a new template.
 
-> **Status:** planning. See [plan.md](plan.md) for the roadmap. The commands below describe the target interface.
+> **Current implementation:** the repository runs the Stage 1 reader with
+> `scans_to_csv/omr_to_csv.py`. The `omr run` commands below are historical
+> examples and are not the current CLI.
+
+For the complete setup and end-to-end workflow, see the repository
+[README](../README.md).
 
 ## What it does
 
@@ -23,9 +28,11 @@ scans/ (JPG, PNG, TIFF, PDF)  +  template.json   -->   results.csv
 ## Install
 
 ```bash
-git clone <your-repo-url> omr && cd omr
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r scans_to_csv/requirements.txt
+python -m pip install opencv-contrib-python
 ```
 
 Requires Python 3.10+. Dependencies: `opencv-python`, `numpy`, `pandas`, `pydantic`, `pymupdf`.
@@ -33,21 +40,19 @@ Requires Python 3.10+. Dependencies: `opencv-python`, `numpy`, `pandas`, `pydant
 ## Usage
 
 ```bash
-# Process a folder of scans
-omr run --template templates/bits_hyd_30q.json --input scans/ --out results.csv
-
-# Also save overlay images showing what was read
-omr run --template templates/bits_hyd_30q.json --input scans/ --out results.csv --debug
-
-# Dump the fill ratio of every bubble (useful for tuning thresholds)
-omr run --template templates/bits_hyd_30q.json --input scans/ --out results.csv --raw
-
-# Check that a template lines up with a scan (writes an overlay image)
-omr check-template --template templates/bits_hyd_30q.json --image scans/sample.jpg
-
-# Measure accuracy against a hand-checked CSV
-omr evaluate --pred results.csv --truth data/ground_truth.csv
+python scans_to_csv/omr_to_csv.py
 ```
+
+This reads `input/` and writes `output/results.csv`. For a custom scan
+directory, use `--scans`; see [scans_to_csv/README.md](../scans_to_csv/README.md).
+
+The sheet designer is a browser app. Start it with:
+
+```bash
+python -m http.server 8000 --directory designer
+```
+
+Then open <http://localhost:8000>.
 
 ## Output
 

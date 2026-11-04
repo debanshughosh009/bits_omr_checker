@@ -9,9 +9,13 @@ Standalone CLI pipeline that reads scanned OMR sheets, applies template matching
 ## Quick Start
 
 ### 1. Install dependencies
+From the repository root:
 ```bash
-pip install -r requirements.txt
-pip install opencv-contrib-python
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r scans_to_csv/requirements.txt
+python -m pip install opencv-contrib-python
 ```
 
 ### 2. Run conversion (defaults to `../input` and `../output/results.csv`)
@@ -23,6 +27,9 @@ Or from inside `scans_to_csv/`:
 ```bash
 python omr_to_csv.py
 ```
+
+The default input folder is `input/` and the default output is
+`output/results.csv`. Put the scans in `input/` before running the command.
 
 ### 3. Custom options
 ```bash

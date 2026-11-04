@@ -89,9 +89,9 @@ def parse_field_string(field_string):
             0
         ]
         start, end = int(start), int(end)
-        if start >= end:
+        if start > end:
             raise Exception(
-                f"Invalid range in fields string: '{field_string}', start: {start} is not less than end: {end}"
+                f"Invalid range in fields string: '{field_string}', start: {start} is greater than end: {end}"
             )
         return [
             f"{field_prefix}{field_number}" for field_number in range(start, end + 1)

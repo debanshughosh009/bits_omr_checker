@@ -53,9 +53,15 @@ tmp/
 # Result spreadsheets and data exports
 results.csv
 Results_*.csv
+score.csv
+scores*.csv
 *.xlsx
 *.xls
 *.csv.tmp
+
+# Scoring answer keys
+scoring/keys/*.json
+!scoring/keys/.gitkeep
 
 # ------------------------------------------------------------------------------
 # Python & Environment Artifacts
@@ -93,3 +99,6 @@ node_modules/
 # Packaged app builds (build/ is ignored above)
 release/
 .venv-build/
+template_1
+template_2
+template_3
