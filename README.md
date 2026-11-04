@@ -1,6 +1,6 @@
-# BITS OMR Checker: Custom Template to Scoring Pipeline
+# OMR Checker: Custom Template to Scoring Pipeline
 
-An automated, template-driven Optical Mark Recognition (OMR) processing and scoring pipeline designed for institutional examinations (BITS Pilani Hyderabad). The system reliably digitizes physical OMR answer sheets into verified structured data at scale.
+An automated, template-driven Optical Mark Recognition (OMR) processing and scoring pipeline designed for institutional examinations. The system reliably digitizes physical OMR answer sheets into verified structured data at scale.
 
 ---
 
@@ -72,7 +72,7 @@ omr_checker/
 
 Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in your browser at `http://127.0.0.1:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
 
-- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the pre-designer BITS sheet or any `template.json`.
+- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the original 30-question sheet or any `template.json`.
 - **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
 - **Evaluating**: type an answer key per set; drop scans in and press **Read** (this runs `scans_to_csv/omr_to_csv.py`); see the score distribution and which questions few got right (often a wrong key); click a scan to see the overlay and correct a misread; **Export CSV** saves the marks.
 

@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "omr-checker",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -36,5 +36,7 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "vite": "^6.3.5"
-  }
+  },
+  "description": "Design OMR answer sheets, read the scans and mark them, all on your own computer.",
+  "author": "Debanshu Ghosh, Aravind Sathesh"
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, BadgeCheck } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
@@ -13,6 +13,10 @@ const HeaderSlots = createContext({});
 
 export function PageHeader({ title, badge, actions }) {
   const { crumb, actions: right } = useContext(HeaderSlots);
+  useEffect(() => {
+    document.title = title ? `${title} · OMR Checker` : 'OMR Checker';
+    return () => { document.title = 'OMR Checker'; };
+  }, [title]);
   return (
     <>
       {crumb &&
@@ -79,6 +83,9 @@ export default function App() {
           ) : (
             <Dashboard />
           )}
+          <footer className='mt-auto border-t px-4 py-3 text-center text-xs text-muted-foreground print:hidden'>
+            Developed by Debanshu Ghosh and Aravind Sathesh
+          </footer>
         </div>
         <ImportDialog open={importing} onClose={() => setImporting(false)} />
         <Toaster position='bottom-right' />

@@ -1,5 +1,5 @@
 """
-server.py - the local app: dashboard, designer and evaluator in one browser window
+server.py - OMR Checker: dashboard, designer and evaluator in one browser window
 ===================================================================================
 Serves the built web app (web/dist) on http://127.0.0.1:8765 and keeps exams,
 answer keys and read sheets in data/omr.db (SQLite), with each exam's scans and
@@ -332,7 +332,7 @@ def main():
         if "--no-browser" not in sys.argv:
             webbrowser.open(URL)
         return
-    print(f"OMR app running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
+    print(f"OMR Checker running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
     if "--no-browser" not in sys.argv:
         webbrowser.open(URL)
     try:

@@ -1,4 +1,4 @@
-// Evaluate a sheet that wasn't designed here: the pre-designer BITS sheet or any template.json
+// Evaluate a sheet that wasn't designed here: the original 30-question sheet or any template.json
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,14 @@ import { api, go, useExams } from "@/lib/api";
 export default function ImportDialog({ open, onClose }) {
   const { reload } = useExams();
   const [name, setName] = useState("");
-  const [choice, setChoice] = useState("bits");
+  const [choice, setChoice] = useState("original");
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setName("");
-    setChoice("bits");
+    setChoice("original");
     setFile(null);
   }, [open]);
 
@@ -28,10 +28,10 @@ export default function ImportDialog({ open, onClose }) {
     setBusy(true);
     try {
       let tpl;
-      if (choice === "bits") tpl = await (await fetch("/scans_to_csv/template.json")).json();
+      if (choice === "original") tpl = await (await fetch("/scans_to_csv/template.json")).json();
       else if (!file) throw new Error("choose a template.json");
       else tpl = JSON.parse(await file.text());
-      const fallback = choice === "bits" ? "BITS 30-question sheet" : file.name.replace(/(_template)?\.json$/i, "");
+      const fallback = choice === "original" ? "30-question sheet" : file.name.replace(/(_template)?\.json$/i, "");
       const { id } = await api("exams", { method: "POST", body: { name: name.trim() || fallback, template: tpl } });
       await reload();
       onClose();
@@ -45,7 +45,7 @@ export default function ImportDialog({ open, onClose }) {
   }
 
   const options = [
-    { value: "bits", label: "The pre-designer BITS sheet", hint: "The hand-calibrated 30-question sheet" },
+    { value: "original", label: "The original 30-question sheet", hint: "The hand-calibrated sheet printed before the designer" },
     { value: "file", label: "A template.json", hint: "Downloaded from the designer or written by hand" },
   ];
 
