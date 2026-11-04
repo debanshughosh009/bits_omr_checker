@@ -89,7 +89,7 @@ Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). I
 - **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
 - **Evaluating**: type an answer key per set; drop scans in and press **Read** (this runs `scans_to_csv/omr_to_csv.py`); see the score distribution and which questions few got right (often a wrong key); click a scan to see the overlay and correct a misread; **Export CSV** saves the marks.
 
-Answer keys: on a sheet's **Answer key** page, pick a set from the bar along the top, give each question a type (single correct, multiple correct, either accepted, bonus, dropped) and click its right option(s): round bubbles take one, square ones any number. **Type for all** switches a whole set between single and multiple correct. **Paste** takes a typed key instead: one answer per question, in order or numbered (`12 AC`); `B` single correct, `AC` multiple correct, `A+` multiple correct with only A right, `A/C` either accepted, `*` bonus (full marks to everyone), `-` dropped. Marking schemes:
+Answer keys: on a sheet's **Answer key** page, pick a set from the bar along the top, give each question a type (single correct, multiple correct, either accepted, bonus, dropped) and click its right option(s): one for single correct, any number for multiple correct or either accepted. **Type for all** switches a whole set between single and multiple correct, and **Copy from** reuses another set's key. Marking schemes:
 
 | | Options |
 |---|---|
