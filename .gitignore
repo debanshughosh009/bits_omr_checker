@@ -85,3 +85,7 @@ data/
 
 # Web app dependencies (web/dist is committed, so running needs only Python)
 node_modules/
+
+# Packaged app builds (build/ is ignored above)
+release/
+.venv-build/
