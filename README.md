@@ -49,12 +49,15 @@ omr_checker/
 │   ├── plan.md             # Master architecture roadmap (M0-M8)
 │   ├── bits_omr_README.md  # Sheet layout calibration notes
 │   └── OMRChecker_README.md
-├── designer/               # Sheet designer: prints a new OMR sheet and its template.json
-│   ├── index.html          # Open in a browser; form on the left, A4 sheet on the right
-│   ├── sheet.js            # The layout both the printout and the template come from
-│   └── app.js              # The form
+├── app/server.py           # Local server: serves the web app, stores exams in data/omr.db (SQLite)
+├── web/                    # The web app (React + shadcn/ui): dashboard, sheet designer, evaluator
+│   ├── src/lib/sheet.js    # The sheet layout both the printout and the template come from
+│   ├── src/lib/score.js    # Answer keys and marking schemes
+│   └── dist/               # The built app, committed so running needs only Python
+├── Start OMR.command/.bat  # Double-click to run (macOS / Windows)
 ├── scripts/                # Developer utilities for templates
 │   ├── check_designer.py   # Round trip: designed sheet -> filled scan -> CSV
+│   ├── check_score.mjs     # Scoring rules
 │   ├── make_template.py    # Generates template.json
 │   ├── check_template.py   # Visual alignment checker
 │   └── validate_schema.py  # Schema validator
@@ -64,6 +67,25 @@ omr_checker/
 ---
 
 ## Getting Started
+
+### The app (dashboard, designer and evaluator, one click)
+
+Double-click **`Start OMR.command`** (macOS) or **`Start OMR.bat`** (Windows). It opens the dashboard in your browser at `http://127.0.0.1:8765`. Everything stays on this machine: exams, answer keys and read sheets are kept in `data/omr.db` (SQLite), and each exam's scans and overlay images under `data/exams/<id>/`. The first start creates `.venv/` and installs the reader's packages into it (a few minutes, once; needs Python 3.10+). Keep the terminal window open while you work; close it to stop.
+
+- **Dashboard**: a box to design a new sheet, and a table of every saved sheet with its scans read, mean and status. Click a sheet to evaluate it; edit its design or delete it from the same row. **Evaluate a sheet designed elsewhere** adds the pre-designer BITS sheet or any `template.json`.
+- **Designing**: the designer below. **Save** keeps the sheet on this computer (in the database, plus `design.json` and `template.json` in `data/exams/<id>/`) and lists it on the dashboard; **Evaluate** saves and opens it. Once scans have been read against a sheet its layout is locked; saving a changed layout offers to make a new sheet instead.
+- **Evaluating**: type an answer key per set; drop scans in and press **Read** (this runs `scans_to_csv/omr_to_csv.py`); see the score distribution and which questions few got right (often a wrong key); click a scan to see the overlay and correct a misread; **Export CSV** saves the marks.
+
+Answer keys: on a sheet's **Answer key** page, pick a set from the bar along the top, give each question a type (single correct, multiple correct, either accepted, bonus, dropped) and click its right option(s): round bubbles take one, square ones any number. **Type for all** switches a whole set between single and multiple correct. **Paste** takes a typed key instead: one answer per question, in order or numbered (`12 AC`); `B` single correct, `AC` multiple correct, `A+` multiple correct with only A right, `A/C` either accepted, `*` bonus (full marks to everyone), `-` dropped. Marking schemes:
+
+| | Options |
+|---|---|
+| Single correct | marks for correct, wrong, blank; a multi-marked answer counts as wrong or scores zero |
+| Multiple correct | **All or nothing**; **Partial** (JEE Advanced style: full for exactly right, per-option marks for a subset of right options, wrong marks if any wrong option); **Proportional** (full × share of right options marked); **Per option** (+ per right option, − per wrong option) |
+
+Marks are recalculated as you change the key or the scheme, and the scheme page shows what sample answers would score. `node scripts/check_score.mjs` checks the scoring rules.
+
+**Changing the app** (needs Node 18+): edit `web/src/`, then restart the app; it rebuilds `web/dist/` on start when the source is newer. For live reload while editing, run `python app/server.py --no-browser` alongside `cd web && npm run dev`. Commit `web/dist/` with your change so machines without Node keep working.
 
 ### 1. Prerequisites & Environment Setup
 
@@ -120,15 +142,17 @@ python scans_to_csv/omr_to_csv.py --help
 
 ### 3. Designing a New Sheet
 
-Open [`designer/index.html`](designer/index.html) in a browser. There is no build step. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter (`F20231187H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year, the four digits, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" back into `ID NO`.
+Open **Design a sheet** in the app. The form on the left sets the header, instructions, set box, options, and number of questions; the right side is the A4 sheet as it will print. Questions spread over up to four columns, fewer when there are many options, and the form says how many questions fit. The ID grid is fixed to the degree (F first degree, H higher degree, P PhD), the year, the last four digits, and the campus letter, written like the campus email (`F20231187@H`): bubbles for the degree, "20" printed, then bubbles for the rest of the year (each digit level with the same digit in the other columns), the four digits, "@" printed, and the campus (H/G/P/D), with a write-in box over each column; the reader puts the "20" and "@" back into `ID NO`. The grid is headed EMAIL; beside it the student writes their name and ID number on two lines, and the quiz date is printed in the header, so there are no signature or date blanks.
+
+**Two sheets per page** (in the Questions card) prints two half-height sheets one above the other on an A4, with a dotted cut line and scissors between them. Bubbles stay full size, so a half holds fewer questions (25 with four options, 20 with five); the question count is capped at what fits. Each half has its own corner markers: cut the pages and scan the halves like any other sheet.
 
 - **Print / PDF** prints the sheet. Print at 100% ("Actual size"), with the browser's headers and footers off.
-- **Download template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
-- **Save draft** / **Open…** keep the form as a `.json` file; the browser also remembers the last draft.
+- **Template** saves the matching `template.json`. Run scans of that sheet with `--template path/to/that_template.json`.
+- **Save draft** / **Open** keep the form as a `.json` file; the browser also remembers the last draft.
 
 The template is computed from the same layout that draws the sheet, so there is nothing to calibrate. The four corner markers let the reader straighten each scan, so skew, shifted scans, and small print scaling are absorbed. Sheets printed before the designer still use the hand-calibrated `scans_to_csv/template.json`.
 
-`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed.
+`python scripts/check_designer.py` renders the default sheet, fills it in, skews it like a scan, and checks `scans_to_csv` reads every answer back. Pass `--pdf sheet.pdf` to test a sheet the browser printed, and `--half` (optionally `--on-a4`) to test a cut-out half of a two-per-page sheet.
 
 ---
 
