@@ -19,13 +19,12 @@ a = Analysis(
         (str(ROOT / "web" / "dist"), "web/dist"),
         (str(STAGE / "config.json"), "scans_to_csv"),
         (str(STAGE / "template.json"), "scans_to_csv"),
-        (str(ROOT / "packaging" / "tray.png"), "packaging"),
     ],
-    # the reader finds its image processors by walking its package, and pystray
-    # picks its backend at run time; neither import is visible to the analysis
+    # the reader finds its image processors by walking its package, an import the
+    # analysis can't see
     # (src/processors has no __init__.py, so collect_submodules skips it: list it by file)
     hiddenimports=[
-        "omr_to_csv", *collect_submodules("src"), *collect_submodules("pystray"),
+        "omr_to_csv", *collect_submodules("src"),
         *(".".join(f.relative_to(STAGE).with_suffix("").parts) for f in (STAGE / "src" / "processors").rglob("*.py")),
     ],
     module_collection_mode={"src": "py"},  # plain .py files, so pkgutil.walk_packages sees them
@@ -51,7 +50,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleDisplayName": "OMR Checker",
             "CFBundleShortVersionString": VERSION,
-            "LSUIElement": True,  # a menu bar app: no Dock icon for a window that isn't there
+            "LSUIElement": True,  # no Dock icon: opening it starts a background server and the app window, then exits
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
             "NSHumanReadableCopyright": "Developed by Debanshu Ghosh and Aravind Sathesh",

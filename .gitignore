@@ -29,6 +29,10 @@ DD_Quiz1_CS/
 !**/templates/*.png
 !**/templates/*.json
 !**/overlay.png
+# the app's own icons
+!packaging/*.png
+!web/public/*.png
+!web/dist/*.png
 !docs/**
 !*.md
 

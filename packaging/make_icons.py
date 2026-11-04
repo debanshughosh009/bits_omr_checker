@@ -2,8 +2,8 @@
 
     .venv/bin/python packaging/make_icons.py
 
-Writes icon.png (1024 px), icon.icns (macOS, needs iconutil), icon.ico (Windows)
-and tray.png (menu bar / notification area) beside this script. Run it again only
+Writes icon.png (1024 px), icon.icns (macOS, needs iconutil) and icon.ico
+(Windows) beside this script. Run it again only
 if the icon changes; the results are committed."""
 import shutil
 import subprocess
@@ -35,7 +35,6 @@ def render(size: int, inset: float, radius: float, glyph: float = 0.58) -> Image
 app = render(1024, 0.1, 0.225)
 app.save(HERE / "icon.png")
 render(256, 0.0, 0.2).save(HERE / "icon.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-render(64, 0.0, 0.25, glyph=0.74).save(HERE / "tray.png")
 
 if shutil.which("iconutil"):
     with tempfile.TemporaryDirectory() as d:
