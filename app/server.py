@@ -11,6 +11,10 @@ browser (web/src/lib/score.js) so rule changes rescore instantly.
     python app/server.py          # or double-click "Start OMR" in the repo root
 
 The first run creates .venv/ and installs scans_to_csv's requirements into it.
+
+Packaged by PyInstaller (packaging/), it runs as a menu bar / tray app instead:
+the app's files are read from the bundle, data lives in the user's app-data
+folder, and the reader runs as this same executable with --reader.
 """
 
 import csv
@@ -29,14 +33,29 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import urlopen
 
+__version__ = "1.0.0"  # the release version; packaging/ and the release workflow read it from here
+
+
+def user_data_dir() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "OMR Checker"
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "OMR Checker"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "omr-checker"
+
+
+FROZEN = getattr(sys, "frozen", False)  # running from the packaged app
 ROOT = Path(__file__).resolve().parent.parent
+RES = Path(getattr(sys, "_MEIPASS", ROOT))  # the app's own read-only files: the repo, or the bundle
 VENV = ROOT / ".venv"
-DATA = ROOT / "data"
-READER = ROOT / "scans_to_csv" / "omr_to_csv.py"
-REQUIREMENTS = ROOT / "scans_to_csv" / "requirements.txt"
+DATA = user_data_dir() if FROZEN else ROOT / "data"
+STAGE = RES / "scans_to_csv"
+REQUIREMENTS = STAGE / "requirements.txt"
 PORT = 8765  # fixed so the designer's saved draft (browser storage is per address) is found again
+if "--port" in sys.argv:  # for testing a second copy beside a running one
+    PORT = int(sys.argv[sys.argv.index("--port") + 1])
 URL = f"http://127.0.0.1:{PORT}/"
-WEB = ROOT / "web" / "dist"  # built by `npm run build` in web/, committed so only Python is needed
+WEB = RES / "web" / "dist"  # built by `npm run build` in web/, committed so only Python is needed
 SCAN_EXTS = {".png", ".jpg", ".jpeg", ".pdf"}
 
 
@@ -44,6 +63,8 @@ SCAN_EXTS = {".png", ".jpg", ".jpeg", ".pdf"}
 
 def bootstrap():
     """Re-run this script inside .venv, creating it and installing requirements when needed."""
+    if FROZEN:  # the packaged app carries its own Python and packages
+        return
     if sys.version_info < (3, 10):
         sys.exit(f"Python 3.10 or newer is needed (this is {sys.version.split()[0]}). Install it from python.org.")
     py = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -66,6 +87,8 @@ def bootstrap():
 def build_web():
     """Run `npm run build` in web/ when the source changed since web/dist was built.
     Without npm the committed build is served as it is."""
+    if FROZEN:
+        return
     src = ROOT / "web"
     built = WEB / "index.html"
     sources = [src / "index.html", src / "package.json", src / "vite.config.js", *(src / "src").rglob("*")]
@@ -168,9 +191,11 @@ def read_scans(exam_id: int, template: dict):
     out = d / "results.csv"
     out.unlink(missing_ok=True)
     with read_lock:
-        p = subprocess.run([sys.executable, str(READER), "--scans", str(incoming), "--template", str(d / "template.json"),
+        # the packaged app has no separate Python, so it runs itself as the reader
+        reader = [sys.executable, "--reader"] if FROZEN else [sys.executable, str(STAGE / "omr_to_csv.py")]
+        p = subprocess.run([*reader, "--config", str(STAGE / "config.json"), "--scans", str(incoming), "--template", str(d / "template.json"),
                             "--out", str(out), "--overlays", str(d / "overlays")],
-                           capture_output=True, text=True, cwd=ROOT)
+                           capture_output=True, text=True, cwd=d, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if p.returncode or not out.exists():
         return {"error": "The reader failed:\n" + "\n".join((p.stderr or p.stdout).strip().splitlines()[-15:])}
 
@@ -200,9 +225,11 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         # Overlay images and the pre-designer template come from the repo; everything else is the web app
         p = unquote(urlparse(path).path)
-        f = (ROOT / p.lstrip("/")).resolve()
-        if f.is_relative_to((DATA / "exams").resolve()) or p == "/scans_to_csv/template.json":
-            return str(f)
+        if p == "/scans_to_csv/template.json":
+            return str(STAGE / "template.json")
+        if p.startswith("/data/"):
+            f = (DATA / p[len("/data/"):]).resolve()
+            return str(f) if f.is_relative_to((DATA / "exams").resolve()) else str(WEB / "missing")
         return super().translate_path(path)
 
     def log_message(self, *a):  # keep the console for errors
@@ -231,6 +258,8 @@ class Handler(SimpleHTTPRequestHandler):
         return True
 
     def api(self, method, p, q):
+        if p == ["version"] and method == "GET":
+            return self.send_json({"version": __version__})
         if p == ["exams"] and method == "GET":
             with db() as con:
                 rows = con.execute("SELECT e.id, e.name, e.created, COUNT(s.id) AS sheets FROM exams e "
@@ -313,10 +342,33 @@ class Handler(SimpleHTTPRequestHandler):
         self.route("DELETE") or self.send_error(405)
 
 
+def run_tray(server):
+    """Serve in the background behind a menu bar (macOS) / notification area (Windows) icon."""
+    import pystray
+    from PIL import Image
+
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    def quit_app(icon):
+        server.shutdown()
+        icon.stop()
+
+    pystray.Icon("OMR Checker", Image.open(RES / "packaging" / "tray.png"), f"OMR Checker {__version__}", menu=pystray.Menu(
+        pystray.MenuItem("Open OMR Checker", lambda: webbrowser.open(URL), default=True),
+        pystray.MenuItem(f"Version {__version__}", None, enabled=False),
+        pystray.MenuItem("Quit", quit_app),
+    )).run()
+
+
 def main():
+    if sys.argv[1:2] == ["--reader"]:  # the packaged app reading a batch for itself (see read_scans)
+        sys.path.insert(0, str(STAGE))
+        import omr_to_csv
+        sys.argv = ["omr_to_csv", *sys.argv[2:]]
+        return omr_to_csv.main()
     bootstrap()
     build_web()
-    DATA.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True)
     with db() as con:
         con.executescript(SCHEMA)
         if "design" not in {r[1] for r in con.execute("PRAGMA table_info(exams)")}:  # databases from before designs were stored
@@ -332,9 +384,11 @@ def main():
         if "--no-browser" not in sys.argv:
             webbrowser.open(URL)
         return
-    print(f"OMR Checker running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
     if "--no-browser" not in sys.argv:
         webbrowser.open(URL)
+    if FROZEN or "--tray" in sys.argv:
+        return run_tray(server)
+    print(f"OMR Checker running at {URL}\nLeave this window open while you work; close it (or Ctrl+C) to stop.", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
